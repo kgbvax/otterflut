@@ -78,25 +78,68 @@ func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 		gfx.PixelRGBA(ren,int32(x),int32(y),255,255,0,255) */
 	pix := opix{A:255, R:byte((color & 0xff0000) >> 16), G:byte((color & 0xff00) >> 8),B: byte((color & 0xff))}
 
-
-
-
 	pixels[y*W+x] = pix
+
+}
+
+var asciiSpace = [256]uint8{'\t': 1, '\n': 1, '\v': 1, '\f': 1, '\r': 1, ' ': 1}
+
+
+
+func nextNonWs(stri string, initial_start int) (start int,end int ) {
+	i := initial_start
+	len:=len(stri)
+	// Skip spaces in the front of the input.
+	for i < len && asciiSpace[stri[i]] != 0 {
+		i++
+	}
+	start=i
+
+	for i < len {
+		if asciiSpace[stri[i]] == 0 {
+			i++
+			continue
+		} else {
+			break
+		}
+	}
+	return start,i
 }
 
 func pfparse(m string) {
-	elems := strings.Split(m, " ")
+	 //elems := strings.Fields(m)
 
 	//0 -> "PX"
 	//1&2 -> x & y (dec)
 	//3 -> Color(hex)
-	x, err := strconv.Atoi(elems[1])
-	checkError(err)
-	y, err := strconv.Atoi(elems[2])
-	checkError(err)
-	color, err := strconv.ParseUint(elems[3], 16, 32)
-	checkError(err)
-	setPixel(uint32(x), uint32(y), uint32(color))
+	if m[0]=='P' && m[1]=='X' && m[2]==' ' {
+		var x,y  int
+		var color uint64
+		var err error
+		var start int=3
+		var end int
+
+		start=3
+
+		start,end = nextNonWs(m,start)
+		if x, err = strconv.Atoi(m[start:end]); err != nil {
+		//	log.Print(err)
+			return
+		}
+
+		start,end = nextNonWs(m,end)
+		if y, err = strconv.Atoi(m[start:end]); err != nil {
+		//	log.Print(err)
+			return
+		}
+
+
+		start,end = nextNonWs(m,end)
+		if color, err = strconv.ParseUint(m[start:end], 16, 32); err !=nil {
+			return
+		}
+ 		setPixel(uint32(x), uint32(y), uint32(color))
+	}
 
 }
 
