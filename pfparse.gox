@@ -1,0 +1,79 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strings"
+	"io/ioutil"
+	"flag"
+	"runtime/pprof"
+	"log"
+	"strconv"
+)
+
+var  pixelcnt int
+
+func checkError(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
+		os.Exit(1)
+	}
+}
+
+func read() string {
+	byte,err := ioutil.ReadFile("test.pxfl")
+	checkError(err)
+	s:=string(byte)
+	return s
+}
+
+func setPixel(x uint32,y uint32 ,color uint32) {
+	pixelcnt++
+
+}
+
+func pfparse(m string ) {
+	elems := strings.Split(m," ")
+
+	//0 -> "PX"
+	//1&2 -> x & y (dec)
+	//3 -> Color(hex)
+	x,err:=strconv.Atoi(elems[1])
+	checkError(err)
+	y,err:=strconv.Atoi(elems[2])
+	checkError(err)
+	color,err:=strconv.ParseUint(elems[3],16,32)
+	checkError(err)
+	setPixel(uint32(x),uint32(y),uint32(color))
+
+}
+
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
+var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
+
+
+func main() {
+	s := read()
+	lines := strings.Split(s,"\n")
+
+	flag.Parse()
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal("could not create CPU profile: ", err)
+		}
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatal("could not start CPU profile: ", err)
+		}
+		defer pprof.StopCPUProfile()
+	}
+
+
+	for c:=0; c<20 ; c++ {
+		for _, element := range lines {
+			pfparse(element)
+		}
+	}
+	println(pixelcnt)
+
+}
