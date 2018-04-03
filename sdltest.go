@@ -6,7 +6,7 @@ import (
 	"time"
 	"log"
 	"strings"
-	"strconv"
+
 	"flag"
 	"os"
 	"runtime/pprof"
@@ -78,27 +78,23 @@ func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 	pixels[y*W+x] = opix{A: 255, R: byte((color & 0xff0000) >> 16), G: byte((color & 0xff00) >> 8), B: byte(color & 0xff)}
 }
 
-var asciiSpace = [256]uint8{'\t': 1, '\n': 1, '\v': 1, '\f': 1, '\r': 1, ' ': 1}
 
 //find next 'field'
-func nextNonWs(stri string, initial_start int) (start int, end int) {
+func nextNonWs(stri string, initial_start int) ( int,  int) {
 	i := initial_start
 	len := len(stri)
 
 	// Skip spaces in the front of the input.
-	for i < len && asciiSpace[stri[i]] != 0 {
+	for i < len  && stri[i] == ' '   {
 		i++
 	}
-	start = i
+	start := i
 
-	for i < len {
-		if asciiSpace[stri[i]] == 0 {
-			i++
-			continue
-		} else {
-			break
-		}
+	// now find the end, ie the next space
+	for  i < len  && stri[i] != ' '  {
+		i++
 	}
+
 	return start, i
 }
 
@@ -108,31 +104,39 @@ var hexval = [256]uint8{'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5,
 	'e': 14, 'E': 14, 'f': 15, 'F': 15}
 
 //quickyla parse a 3 byte hex number
-func parseHex3(m string) uint64 {
-	if len(m) != 6 {
-		return 0 //ignore
-	}
-	var val uint64
+func parseHex3(m string) uint32 {
+
 	//MUL version
-	val = 0x100000*uint64(hexval[m[0]]) + 0x010000*uint64(hexval[m[1]]) + 0x001000*uint64(hexval[m[2]]) +
-		0x000100*uint64(hexval[m[3]]) + 0x000010*uint64(hexval[m[4]]) + uint64(hexval[m[5]])
+	return  0x100000*uint32(hexval[m[0]]) + 0x010000*uint32(hexval[m[1]]) + 0x001000*uint32(hexval[m[2]]) +
+		0x000100*uint32(hexval[m[3]]) + 0x000010*uint32(hexval[m[4]]) + uint32(hexval[m[5]])
 
 	//Shift version
-	/* val = uint64(hexval[m[0]])<<20 + uint64(hexval[m[1]]) <<16 + uint64(hexval[m[2]])<<12 +
-		 uint64(hexval[m[3]])<<8 +  uint64(hexval[m[4]])<<4 + uint64(hexval[m[5]])*/
-	return val
+	/* return uint32(hexval[m[0]])<<20 + uint32(hexval[m[1]]) <<16 + uint32(hexval[m[2]])<<12 +
+		 uint32(hexval[m[3]])<<8 +  uint32(hexval[m[4]])<<4 + uint32(hexval[m[5]])*/
+
 }
 
 //quickly parse a 4 byte hex number
-func parseHex4(m string) uint64 {
-	if len(m) != 8 {
-		return 0 //ignore
+func parseHex4(m string) uint32 {
+
+	return 0x10000000*uint32(hexval[m[0]]) + 0x01000000*uint32(hexval[m[1]]) + 0x00100000*uint32(hexval[m[2]]) +
+		0x00010000*uint32(hexval[m[3]]) + 0x00001000*uint32(hexval[m[4]]) + 0x00000100*uint32(hexval[m[5]]) +
+		0x00000010*uint32(hexval[m[6]]) + uint32(hexval[m[7]])
+
+}
+
+//quickly parse an uint
+//non digit input will lead to 0 as result
+func parsUint(m string) uint32 {
+	var n uint32
+	for _, ch := range []byte(m) {
+		ch -= '0'
+		if ch > 9 || ch<0{
+			return 0
+		}
+		n = n*10 + uint32(ch)
 	}
-	var val uint64
-	val = 0x10000000*uint64(hexval[m[0]]) + 0x01000000*uint64(hexval[m[1]]) + 0x00100000*uint64(hexval[m[2]]) +
-		0x00010000*uint64(hexval[m[3]]) + 0x00001000*uint64(hexval[m[4]]) + 0x00000100*uint64(hexval[m[5]]) +
-		0x00000010*uint64(hexval[m[4]]) + uint64(hexval[m[5]])
-	return val
+	return n
 }
 
 func pfparse(m string) {
@@ -142,26 +146,27 @@ func pfparse(m string) {
 	//1&2 -> x & y (dec)
 	//3 -> Color(hex)
 	if m[0] == 'P' && m[1] == 'X' && m[2] == ' ' {
-		var x, y int
-		var color uint64
-		var err error
+
+		var color uint32
 
 		start, end := nextNonWs(m, 3)
-		if x, err = strconv.Atoi(m[start:end]); err != nil {
-			//	log.Print(err)
-			return
-		}
+		x:=parsUint(m[start:end])
 
 		start, end = nextNonWs(m, end)
-		if y, err = strconv.Atoi(m[start:end]); err != nil {
-			//	log.Print(err)
-			return
-		}
+		y:=parsUint(m[start:end])
 
 		start, end = nextNonWs(m, end)
+		hexstr :=m[start:end]
 
-		color = parseHex3(m[start:end])
-		setPixel(uint32(x), uint32(y), uint32(color))
+		if len(hexstr) == 6 {
+			color = parseHex3(hexstr)
+		} else if len(hexstr)==8 {
+			color = parseHex4(hexstr)
+		} else {
+			//huh?
+			return
+		}
+		setPixel( x, y, color)
 	} //else ignore
 }
 
@@ -247,9 +252,7 @@ func updater() {
 func main() {
 	runtime.GOMAXPROCS(4 + runtime.NumCPU())
 
-
-
-	bdata, err := ioutil.ReadFile("test.pxfl")
+	bdata, err := ioutil.ReadFile("small.pxfl")
 	checkError(err)
 	s := string(bdata)
 	lines = strings.Split(s, "\n")
