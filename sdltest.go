@@ -187,8 +187,11 @@ var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
 var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
 
 func printInfo(sur *sdl.Surface, name string) {
-	var formatName="-"
 
+	var formatName="-"
+	if sur == nil {
+		log.Print("surface is nil")
+	}
 	imgFormat:=sur.Format
 
 	if imgFormat != nil {
@@ -235,6 +238,7 @@ func flipper() {
 	if err != nil {
 		panic(err)
 	}
+	printInfo(srd,"buffer")
 	/*
 
 	ren,err := sdl.CreateRenderer(window,-1,0)
@@ -254,7 +258,7 @@ func flipper() {
 	surface, err := window.GetSurface()
 	checkError(err)
 	printInfo(surface,"window")
-	printInfo(srd,"buffer")
+
 
 	for ; running == true; {
 
