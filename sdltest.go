@@ -237,7 +237,8 @@ func flipper() {
 
 	srd, err := sdl.CreateRGBSurfaceWithFormatFrom(unsafe.Pointer(&pixels), W, H, 24, 4*W, sdl.PIXELFORMAT_ARGB8888)
 	if srd == nil {
-		log.Print(sdl.GetError())
+		log.Printf("surface creation failed: %v",sdl.GetError())
+		panic( sdl.GetError())
 	}
 	printInfo(srd,"buffer")
 	/*
