@@ -187,11 +187,13 @@ var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
 var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
 
 func printInfo(sur *sdl.Surface, name string) {
-	log.Printf("%v pixel format: %s\n", sdl.GetPixelFormatName(uint((sur.Format).Format)),name)
-	log.Printf("%v bytes per pixel: %v\n", (sur.Format).BytesPerPixel,name)
-	log.Printf("%v bits per pixel: %v\n", (sur.Format).BitsPerPixel,name)
-	log.Printf("%v size: %v x %v\n", sur.W, sur.H,name)
-	log.Printf("%v pitch: %v\n", sur.Pitch,name)
+	format:= uint((sur.Format).Format)
+	formatName := sdl.GetPixelFormatName(format)
+	log.Printf("%v pixel format: %s\n", name, formatName)
+	log.Printf("%v bytes per pixel: %v\n",name, (sur.Format).BytesPerPixel)
+	log.Printf("%v bits per pixel: %v\n",name, (sur.Format).BitsPerPixel)
+	log.Printf("%v size: %v x %v\n",name, sur.W, sur.H)
+	log.Printf("%v pitch: %v\n",name,  sur.Pitch)
 }
 
 func flipper() {
