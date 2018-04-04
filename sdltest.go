@@ -209,7 +209,7 @@ func flipper() {
 		}
 	}
 
-	if err := sdl.Init(sdl.INIT_EVENTS | sdl.INIT_TIMER); err != nil {
+	if err := sdl.Init(sdl.INIT_EVENTS | sdl.INIT_TIMER | sdl.INIT_VIDEO); err != nil {
 		panic(err)
 	}
 	defer sdl.Quit()
