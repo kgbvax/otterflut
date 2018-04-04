@@ -234,8 +234,12 @@ func flipper() {
 		W, H, sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_RESIZABLE|sdl.WINDOW_OPENGL)
 	checkError(err)
 	defer window.Destroy()
+	surface, err := window.GetSurface()
+	checkError(err)
+	printInfo(surface,"window")
 
-	srd, err := sdl.CreateRGBSurfaceWithFormatFrom(unsafe.Pointer(&pixels), W, H, 32, 4*W, sdl.PIXELFORMAT_ARGB8888)
+
+	srd, err := sdl.CreateRGBSurfaceWithFormatFrom(unsafe.Pointer(&pixels), W, H, 24, 4*W, sdl.PIXELFORMAT_RGB888)
 	if srd == nil {
 		log.Printf("surface creation failed: %v",sdl.GetError())
 		panic( sdl.GetError())
@@ -257,9 +261,7 @@ func flipper() {
 	//checkError(err)
 	*/
 
-	surface, err := window.GetSurface()
-	checkError(err)
-	printInfo(surface,"window")
+
 
 
 	for ; running == true; {
