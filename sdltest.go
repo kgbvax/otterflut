@@ -186,12 +186,12 @@ func pfparse(m string) {
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
 var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
 
-func printInfo(sur *sdl.Surface) {
-	log.Printf("pixel format: %s\n", sdl.GetPixelFormatName(uint((sur.Format).Format)))
-	log.Printf("bytes per pixel: %v\n", (sur.Format).BytesPerPixel)
-	log.Printf("bits per pixel: %v\n", (sur.Format).BitsPerPixel)
-	log.Printf("size: %v x %v\n", sur.W, sur.H)
-	log.Printf("pitch: %v\n", sur.Pitch)
+func printInfo(sur *sdl.Surface, name string) {
+	log.Printf("%v pixel format: %s\n", sdl.GetPixelFormatName(uint((sur.Format).Format)),name)
+	log.Printf("%v bytes per pixel: %v\n", (sur.Format).BytesPerPixel,name)
+	log.Printf("%v bits per pixel: %v\n", (sur.Format).BitsPerPixel,name)
+	log.Printf("%v size: %v x %v\n", sur.W, sur.H,name)
+	log.Printf("%v pitch: %v\n", sur.Pitch,name)
 }
 
 func flipper() {
@@ -243,8 +243,8 @@ func flipper() {
 
 	surface, err := window.GetSurface()
 	checkError(err)
-	printInfo(surface)
-	printInfo(srd)
+	printInfo(surface,"window")
+	printInfo(srd,"buffer")
 
 	for ; running == true; {
 
