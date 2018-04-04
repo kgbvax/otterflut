@@ -187,7 +187,7 @@ var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
 var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
 
 func printInfo(sur *sdl.Surface, name string) {
-
+	log.Print("foo")
 	var formatName="-"
 	if sur == nil {
 		log.Print("surface is nil")
