@@ -27,6 +27,8 @@ type opix struct {
 const W = 1440
 const H = 900
 
+const PX uint16 = uint16('P'<<8) | uint16('X')
+
 /*const W = 800
 const H = 600*/
 var ren *sdl.Renderer
@@ -78,20 +80,19 @@ func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 	pixels[y*W+x] = opix{A: 255, R: byte((color & 0xff0000) >> 16), G: byte((color & 0xff00) >> 8), B: byte(color & 0xff)}
 }
 
-
-//find next 'field'
-func nextNonWs(stri string, initial_start int) ( int,  int) {
+//find next 'field' quickly ;-)
+func nextNonWs(stri string, initial_start int) (int, int) {
 	i := initial_start
 	len := len(stri)
 
 	// Skip spaces in the front of the input.
-	for i < len  && stri[i] == ' '   {
+	for i < len && stri[i] == ' ' {
 		i++
 	}
 	start := i
 
 	// now find the end, ie the next space
-	for  i < len  && stri[i] != ' '  {
+	for i < len && stri[i] != ' ' {
 		i++
 	}
 
@@ -107,7 +108,7 @@ var hexval = [256]uint8{'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5,
 func parseHex3(m string) uint32 {
 
 	//MUL version
-	return  0x100000*uint32(hexval[m[0]]) + 0x010000*uint32(hexval[m[1]]) + 0x001000*uint32(hexval[m[2]]) +
+	return 0x100000*uint32(hexval[m[0]]) + 0x010000*uint32(hexval[m[1]]) + 0x001000*uint32(hexval[m[2]]) +
 		0x000100*uint32(hexval[m[3]]) + 0x000010*uint32(hexval[m[4]]) + uint32(hexval[m[5]])
 
 	//Shift version
@@ -127,6 +128,7 @@ func parseHex4(m string) uint32 {
 
 //quickly parse an uint
 //non digit input will lead to 0 as result
+/*
 func parsUint(m string) uint32 {
 	var n uint32
 	for _, ch := range []byte(m) {
@@ -138,6 +140,17 @@ func parsUint(m string) uint32 {
 	}
 	return n
 }
+ */
+
+//no bounds checks we don't care (at this point)
+func parsUint(m string) uint32 {
+	var n uint32
+	l := len(m)
+	for i := 0; i < l; i++ {
+		n = n*10 + uint32(m[i]-'0')
+	}
+	return n
+}
 
 func pfparse(m string) {
 	//elems := strings.Fields(m)
@@ -145,29 +158,29 @@ func pfparse(m string) {
 	//0 -> "PX"
 	//1&2 -> x & y (dec)
 	//3 -> Color(hex)
-	if m[0] == 'P' && m[1] == 'X' && m[2] == ' ' {
+	if m[0] == 'P' { // we only test for the first "P" on purpose.
 
 		var color uint32
 
 		start, end := nextNonWs(m, 3)
-		x:=parsUint(m[start:end])
+		x := parsUint(m[start:end])
 
 		start, end = nextNonWs(m, end)
-		y:=parsUint(m[start:end])
+		y := parsUint(m[start:end])
 
 		start, end = nextNonWs(m, end)
-		hexstr :=m[start:end]
+		hexstr := m[start:end]
 
 		if len(hexstr) == 6 {
 			color = parseHex3(hexstr)
-		} else if len(hexstr)==8 {
+		} else if len(hexstr) == 8 {
 			color = parseHex4(hexstr)
 		} else {
 			//huh?
 			return
 		}
-		setPixel( x, y, color)
-	} //else ignore
+		setPixel(x, y, color)
+	} //else TODO
 }
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
@@ -182,10 +195,26 @@ func printInfo(sur *sdl.Surface) {
 }
 
 func flipper() {
+	sdl.SetHint("SDL_HINT_FRAMEBUFFER_ACCELERATION", "1")
+
+	numdrv, _ := sdl.GetNumRenderDrivers()
+	for i := 0; i < numdrv; i++ {
+		var rinfo sdl.RendererInfo
+		sdl.GetRenderDriverInfo(i, &rinfo)
+		name := rinfo.Name
+		log.Printf("available rendere: %v", name)
+		if name == "metal" {
+			log.Print("🤘!")
+			sdl.SetHint("SDL_HINT_RENDER_DRIVER", "metal")
+		}
+	}
+
 	if err := sdl.Init(sdl.INIT_EVENTS | sdl.INIT_TIMER); err != nil {
 		panic(err)
 	}
 	defer sdl.Quit()
+
+
 
 	window, err := sdl.CreateWindow("test", 0, 0,
 		W, H, sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_RESIZABLE|sdl.WINDOW_OPENGL)
@@ -225,7 +254,8 @@ func flipper() {
 		//	renderer.SetRenderTarget(tex)
 		//		texture.Unlock()
 		//		ren.Present()
-		srd.Blit(&allRect, surface, &allRect)
+		srd.Blit(nil, surface, nil)
+
 		frames++
 		window.UpdateSurface()
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
@@ -233,6 +263,17 @@ func flipper() {
 			case *sdl.QuitEvent:
 				println("Quit")
 				running = false
+				if *memprofile != "" {
+					f, err := os.Create(*memprofile)
+					if err != nil {
+						log.Fatal("could not create memory profile: ", err)
+					}
+					runtime.GC() // get up-to-date statistics
+					if err := pprof.WriteHeapProfile(f); err != nil {
+						log.Fatal("could not write memory profile: ", err)
+					}
+					f.Close()
+				}
 				break
 			}
 		}
@@ -252,10 +293,11 @@ func updater() {
 func main() {
 	runtime.GOMAXPROCS(4 + runtime.NumCPU())
 
-	bdata, err := ioutil.ReadFile("small.pxfl")
+	bdata, err := ioutil.ReadFile("test.pxfl")
 	checkError(err)
 	s := string(bdata)
 	lines = strings.Split(s, "\n")
+	//log.Println(http.ListenAndServe("localhost:6060", nil))
 
 	flag.Parse()
 	if *cpuprofile != "" {
@@ -266,8 +308,10 @@ func main() {
 		if err := pprof.StartCPUProfile(f); err != nil {
 			log.Fatal("could not start CPU profile: ", err)
 		}
+
 		defer pprof.StopCPUProfile()
 	}
+
 	go printPixel(&pixelcnt)
 	go printFps(&frames)
 	go updater()
