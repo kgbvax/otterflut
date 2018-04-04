@@ -187,8 +187,16 @@ var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
 var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
 
 func printInfo(sur *sdl.Surface, name string) {
-	format:= uint((sur.Format).Format)
-	formatName := sdl.GetPixelFormatName(format)
+	var formatName="-"
+
+	imgFormat:=sur.Format
+
+	if imgFormat != nil {
+		format:= uint((sur.Format).Format)
+		formatName = sdl.GetPixelFormatName(format)
+	} else {
+		formatName ="Format is nil"
+	}
 	log.Printf("%v pixel format: %s\n", name, formatName)
 	log.Printf("%v bytes per pixel: %v\n",name, (sur.Format).BytesPerPixel)
 	log.Printf("%v bits per pixel: %v\n",name, (sur.Format).BitsPerPixel)
