@@ -21,11 +21,11 @@ type opix struct {
 	B byte
 	G byte
 	R byte
-	A byte
+/*	A byte */
 }
 
 const W = 1440
-const H = 900
+const H = 855
 
 const PX uint16 = uint16('P'<<8) | uint16('X')
 
@@ -77,7 +77,7 @@ func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 	/*	//sdlcol:=sdl.Color{R: uint8((color & 0xff0000) >> 16),G: uint8((color & 0xff00) >> 8), B: uint8(color & 0xff), A: uint8((color&0xff000000)>>24) }
 		gfx.PixelRGBA(ren,int32(x),int32(y),255,255,0,255) */
 
-	pixels[y*W+x] = opix{A: 255, R: byte((color & 0xff0000) >> 16), G: byte((color & 0xff00) >> 8), B: byte(color & 0xff)}
+	pixels[y*W+x] = opix{/*A: 255,*/ R: byte((color & 0xff0000) >> 16), G: byte((color & 0xff00) >> 8), B: byte(color & 0xff)}
 }
 
 //find next 'field' quickly ;-)
@@ -239,7 +239,8 @@ func flipper() {
 	printInfo(surface,"window")
 
 
-	srd, err := sdl.CreateRGBSurfaceWithFormatFrom(unsafe.Pointer(&pixels), W, H, 24, 4*W, sdl.PIXELFORMAT_RGB888)
+
+	srd, err := sdl.CreateRGBSurfaceWithFormatFrom(unsafe.Pointer(&pixels), W, H, 24, 3*W, sdl.PIXELFORMAT_RGB888)
 	if srd == nil {
 		log.Printf("surface creation failed: %v",sdl.GetError())
 		panic( sdl.GetError())
