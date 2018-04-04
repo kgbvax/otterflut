@@ -191,6 +191,7 @@ func printInfo(sur *sdl.Surface, name string) {
 	var formatName="-"
 	if sur == nil {
 		log.Print("surface is nil")
+		return
 	}
 	imgFormat:=sur.Format
 
@@ -235,8 +236,8 @@ func flipper() {
 	defer window.Destroy()
 
 	srd, err := sdl.CreateRGBSurfaceWithFormatFrom(unsafe.Pointer(&pixels), W, H, 24, 4*W, sdl.PIXELFORMAT_ARGB8888)
-	if err != nil {
-		panic(err)
+	if srd == nil {
+		log.Print(sdl.GetError())
 	}
 	printInfo(srd,"buffer")
 	/*
