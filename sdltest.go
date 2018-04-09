@@ -2,11 +2,9 @@ package main
 
 import (
 	"github.com/veandco/go-sdl2/sdl"
-
 	"time"
 	"log"
 	"strings"
-
 	"flag"
 	"os"
 	"runtime/pprof"
@@ -21,22 +19,15 @@ type opix struct {
 	B byte
 	G byte
 	R byte
-/*	A byte */
+	A byte
 }
 
-const W = 1440
-const H = 855
+var W uint32 = 1824
+var H uint32 = 968
 
-const PX uint16 = uint16('P'<<8) | uint16('X')
-
-/*const W = 800
-const H = 600*/
-var ren *sdl.Renderer
-
-var allRect = sdl.Rect{0, 0, W, H}
 var lines []string
 
-var pixels = [W * H]opix{}
+var pixels *[]uint32
 var running = true
 
 func printFps(frames *uint64) {
@@ -71,29 +62,24 @@ func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 	if x >= W || y >= H {
 		return // ignore
 	}
-
 	pixelcnt++
-
 	/*	//sdlcol:=sdl.Color{R: uint8((color & 0xff0000) >> 16),G: uint8((color & 0xff00) >> 8), B: uint8(color & 0xff), A: uint8((color&0xff000000)>>24) }
 		gfx.PixelRGBA(ren,int32(x),int32(y),255,255,0,255) */
-
-	pixels[y*W+x] = opix{/*A: 255,*/ R: byte((color & 0xff0000) >> 16), G: byte((color & 0xff00) >> 8), B: byte(color & 0xff)}
+	(*pixels)[y*W+x] = color //uint32((color & 0xff0000) >> 16) | uint32((color & 0xff00) >> 8) | uint32(color & 0xff)
 }
 
 //find next 'field' quickly ;-)
-func nextNonWs(stri string, initial_start int) (int, int) {
-	i := initial_start
-	len := len(stri)
+func nextNonWs(stri string, initialStart int) (int, int) {
+	i := initialStart
+	length := len(stri)
 
 	// Skip spaces in the front of the input.
-	for i < len && stri[i] == ' ' {
-		i++
+	for ; i < length && stri[i] == ' '; i++ {
 	}
 	start := i
 
 	// now find the end, ie the next space
-	for i < len && stri[i] != ' ' {
-		i++
+	for ; i < length && stri[i] != ' '; i++ {
 	}
 
 	return start, i
@@ -104,45 +90,24 @@ var hexval = [256]uint8{'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5,
 	'6': 6, '7': 7, '8': 8, '9': 9, 'a': 10, 'A': 10, 'b': 11, 'B': 11, 'c': 12, 'C': 12, 'd': 13, 'D': 13,
 	'e': 14, 'E': 14, 'f': 15, 'F': 15}
 
-//quickyla parse a 3 byte hex number
+//quickly  parse a 3 byte hex number
 func parseHex3(m string) uint32 {
-
 	//MUL version
 	return 0x100000*uint32(hexval[m[0]]) + 0x010000*uint32(hexval[m[1]]) + 0x001000*uint32(hexval[m[2]]) +
 		0x000100*uint32(hexval[m[3]]) + 0x000010*uint32(hexval[m[4]]) + uint32(hexval[m[5]])
-
-	//Shift version
-	/* return uint32(hexval[m[0]])<<20 + uint32(hexval[m[1]]) <<16 + uint32(hexval[m[2]])<<12 +
-		 uint32(hexval[m[3]])<<8 +  uint32(hexval[m[4]])<<4 + uint32(hexval[m[5]])*/
-
 }
 
 //quickly parse a 4 byte hex number
 func parseHex4(m string) uint32 {
-
+	//MUL version
 	return 0x10000000*uint32(hexval[m[0]]) + 0x01000000*uint32(hexval[m[1]]) + 0x00100000*uint32(hexval[m[2]]) +
 		0x00010000*uint32(hexval[m[3]]) + 0x00001000*uint32(hexval[m[4]]) + 0x00000100*uint32(hexval[m[5]]) +
 		0x00000010*uint32(hexval[m[6]]) + uint32(hexval[m[7]])
 
 }
 
-//quickly parse an uint
-//non digit input will lead to 0 as result
-/*
-func parsUint(m string) uint32 {
-	var n uint32
-	for _, ch := range []byte(m) {
-		ch -= '0'
-		if ch > 9 || ch<0{
-			return 0
-		}
-		n = n*10 + uint32(ch)
-	}
-	return n
-}
- */
-
-//no bounds checks we don't care (at this point)
+// Swiftly parse an Uint32
+// no bounds checks we don't care (at this point)
 func parsUint(m string) uint32 {
 	var n uint32
 	l := len(m)
@@ -188,24 +153,24 @@ var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
 
 func printInfo(sur *sdl.Surface, name string) {
 	log.Print("foo")
-	var formatName="-"
+	var formatName = "-"
 	if sur == nil {
 		log.Print("surface is nil")
 		return
 	}
-	imgFormat:=sur.Format
+	imgFormat := sur.Format
 
 	if imgFormat != nil {
-		format:= uint((sur.Format).Format)
+		format := uint((sur.Format).Format)
 		formatName = sdl.GetPixelFormatName(format)
 	} else {
-		formatName ="Format is nil"
+		formatName = "Format is nil"
 	}
 	log.Printf("%v pixel format: %s\n", name, formatName)
-	log.Printf("%v bytes per pixel: %v\n",name, (sur.Format).BytesPerPixel)
-	log.Printf("%v bits per pixel: %v\n",name, (sur.Format).BitsPerPixel)
-	log.Printf("%v size: %v x %v\n",name, sur.W, sur.H)
-	log.Printf("%v pitch: %v\n",name,  sur.Pitch)
+	log.Printf("%v bytes per pixel: %v\n", name, (sur.Format).BytesPerPixel)
+	log.Printf("%v bits per pixel: %v\n", name, (sur.Format).BitsPerPixel)
+	log.Printf("%v size: %v x %v\n", name, sur.W, sur.H)
+	log.Printf("%v pitch: %v\n", name, sur.Pitch)
 }
 
 func flipper() {
@@ -228,53 +193,28 @@ func flipper() {
 	}
 	defer sdl.Quit()
 
-
-
-	window, err := sdl.CreateWindow("test", 0, 0,
-		W, H, sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_RESIZABLE|sdl.WINDOW_OPENGL)
+	window, err := sdl.CreateWindow("otterflut", 0, 0,
+		1900, 500, sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS|sdl.WINDOW_OPENGL)
 	checkError(err)
 	defer window.Destroy()
+
 	surface, err := window.GetSurface()
 	checkError(err)
-	printInfo(surface,"window")
 
+	printInfo(surface, "window")
 
+	W = uint32(surface.W)
+	H = uint32(surface.H)
 
-	srd, err := sdl.CreateRGBSurfaceWithFormatFrom(unsafe.Pointer(&pixels), W, H, 24, 3*W, sdl.PIXELFORMAT_RGB888)
-	if srd == nil {
-		log.Printf("surface creation failed: %v",sdl.GetError())
-		panic( sdl.GetError())
-	}
-	printInfo(srd,"buffer")
-	/*
-
-	ren,err := sdl.CreateRenderer(window,-1,0)
-
-	defer ren.Destroy()
-	checkError(err)
-	renderer_info,err:=  ren.GetInfo()
-
-	checkError(err)
-	ren.Clear()
-	log.Printf(" renderer name: %s\b",renderer_info.Name)
-
-	//texture,err := renderer.CreateTexture( sdl.PIXELFORMAT_RGB24, sdl.TEXTUREACCESS_STREAMING, W, H)
-	//checkError(err)
-	*/
-
-
-
+	pixelsPtr := uintptr(surface.Data())
+	pixelsSlice := struct {
+		addr uintptr
+		len  int
+		cap  int
+	}{pixelsPtr, int(W * H * 4), int(W * H * 4)}
+	pixels = (*[]uint32)(unsafe.Pointer(&pixelsSlice))
 
 	for ; running == true; {
-
-		//		var pixeldata []byte= C.GoBytes(unsafe.Pointer(&pixels[0][0]),W*H)
-		//	texture.Lock(&allRect)
-		//	tex,_:=renderer.CreateTextureFromSurface(srd)
-		//	renderer.SetRenderTarget(tex)
-		//		texture.Unlock()
-		//		ren.Present()
-		srd.Blit(nil, surface, nil)
-
 		frames++
 		window.UpdateSurface()
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
@@ -296,11 +236,15 @@ func flipper() {
 				break
 			}
 		}
-		sdl.Delay(0)
+
 	}
 }
 
 func updater() {
+	for pixels==nil {
+		runtime.Gosched()
+	}
+
 	for ; running == true; {
 		for _, element := range lines {
 			pfparse(element)
@@ -312,7 +256,7 @@ func updater() {
 func main() {
 	runtime.GOMAXPROCS(4 + runtime.NumCPU())
 
-	bdata, err := ioutil.ReadFile("test.pxfl")
+	bdata, err := ioutil.ReadFile("small.pxfl")
 	checkError(err)
 	s := string(bdata)
 	lines = strings.Split(s, "\n")
@@ -334,6 +278,8 @@ func main() {
 	go printPixel(&pixelcnt)
 	go printFps(&frames)
 	go updater()
-
 	flipper()
+
+
+
 }

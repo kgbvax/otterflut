@@ -1,0 +1,43 @@
+package main
+
+import (
+ 	"github.com/blackspace/gofb/framebuffer"
+	"log"
+)
+
+
+
+
+
+var fbh *framebuffer.Framebuffer
+
+func   Init() {
+	fbh = framebuffer.NewFramebuffer()
+	defer fbh.Release()
+
+	fbh.Init()
+
+	log.Printf("frambuffer xres=%v yres=%v depth=%v",fbh.Xres,fbh.Yres,fbh.BitsPerPixel)
+
+}
+
+func   SetPixel(w int, h int) {
+
+}
+
+func main() {
+
+	Init()
+	var col uint32
+
+
+	for {
+		for x:=0 ; x < fbh.Xres ; x++ {
+			for y:=0 ; y < fbh.Yres ; y++ {
+				fbh.SetPixel(x,y,col,col,col,col)
+			}
+		}
+		col++
+	}
+}
+
