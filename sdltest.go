@@ -29,6 +29,7 @@ var lines []string
 
 var pixels *[]uint32
 var running = true
+var window *sdl.Window
 
 func printFps(frames *uint64) {
 	for {
@@ -173,7 +174,9 @@ func printInfo(sur *sdl.Surface, name string) {
 	log.Printf("%v pitch: %v\n", name, sur.Pitch)
 }
 
-func flipper() {
+func windowInit() {
+	var err error
+
 	sdl.SetHint("SDL_HINT_FRAMEBUFFER_ACCELERATION", "1")
 
 	numdrv, _ := sdl.GetNumRenderDrivers()
@@ -188,15 +191,15 @@ func flipper() {
 		}
 	}
 
-	if err := sdl.Init(sdl.INIT_EVENTS | sdl.INIT_TIMER | sdl.INIT_VIDEO); err != nil {
+	if err = sdl.Init(sdl.INIT_EVENTS | sdl.INIT_TIMER | sdl.INIT_VIDEO); err != nil {
 		panic(err)
 	}
-	defer sdl.Quit()
 
-	window, err := sdl.CreateWindow("otterflut", 0, 0,
+
+	window, err = sdl.CreateWindow("otterflut", 0, 0,
 		1900, 500, sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS|sdl.WINDOW_OPENGL)
 	checkError(err)
-	defer window.Destroy()
+
 
 	surface, err := window.GetSurface()
 	checkError(err)
@@ -214,10 +217,17 @@ func flipper() {
 	}{pixelsPtr, int(W * H * 4), int(W * H * 4)}
 	pixels = (*[]uint32)(unsafe.Pointer(&pixelsSlice))
 
-	for ; running == true; {
-		frames++
-		window.UpdateSurface()
+}
+
+func updateWin() {
+	frames++
+	window.UpdateSurface()
+}
+
+func sdlEventLoop() {
+	for running==true {
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+			//log.Print(event)
 			switch event.(type) {
 			case *sdl.QuitEvent:
 				println("Quit")
@@ -236,12 +246,12 @@ func flipper() {
 				break
 			}
 		}
-
 	}
 }
 
-func updater() {
-	for pixels==nil {
+func updater(gridx int) {
+	runtime.LockOSThread()
+	for pixels==nil { //wait for bitmap to become available
 		runtime.Gosched()
 	}
 
@@ -251,10 +261,12 @@ func updater() {
 		}
 		//running=false
 	}
+	runtime.UnlockOSThread()
 }
 
 func main() {
 	runtime.GOMAXPROCS(4 + runtime.NumCPU())
+
 
 	bdata, err := ioutil.ReadFile("small.pxfl")
 	checkError(err)
@@ -274,12 +286,23 @@ func main() {
 
 		defer pprof.StopCPUProfile()
 	}
-
+	windowInit()
 	go printPixel(&pixelcnt)
 	go printFps(&frames)
-	go updater()
-	flipper()
 
 
+	ticker := time.NewTicker(1000 / 30 * time.Millisecond) //target 30fps
+	go func() {
+		for  range ticker.C {
+			 updateWin()
+		}
+	}()
+
+	go updater(1)
+	//go updater(2)
+	//go updater(3)
+	//go updater(4)
+
+	sdlEventLoop()
 
 }
