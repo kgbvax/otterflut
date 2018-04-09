@@ -8,10 +8,10 @@ import (
 	"flag"
 	"os"
 	"runtime/pprof"
-	"github.com/dustin/go-humanize"
 	"io/ioutil"
 	"runtime"
 	"unsafe"
+	"github.com/dustin/go-humanize"
 )
 
 type opix struct {
@@ -27,6 +27,10 @@ var H uint32 = 968
 
 var lines []string
 
+const numUpdater int = 4
+
+var pixelcnt [numUpdater]int64
+
 var pixels *[]uint32
 var running = true
 var window *sdl.Window
@@ -39,17 +43,28 @@ func printFps(frames *uint64) {
 	}
 }
 
-func printPixel(pixelcnt *int64) {
+func printPixel() {
 	runtime.LockOSThread()
-	for {
+	for  running==true {
+		//start:=time.Now()
 		time.Sleep(time.Second * 1)
-		log.Printf("px/s=%s\b", humanize.Comma(*pixelcnt))
-		*pixelcnt = 0
+		var total int64
+	    for i:=0 ; i< numUpdater; i++ {
+	    	total+=pixelcnt[i]
+	    	log.Printf("u-%v %v",i,humanize.Comma(pixelcnt[i]))
+	    	pixelcnt[i]=0
+		}
+		log.Printf("total %v",humanize.Comma( total))
+
+	//	pixelPerMsec:= pixelCount / int64(time.Since(start) / time.Millisecond)
+	//	log.Printf("px/s=%v",  humanize.Comma(pixelPerMsec*1000))
+	//	*pixelcnt = 0
 	}
+	runtime.UnlockOSThread()
 }
 
 //stats
-var pixelcnt int64
+
 var frames uint64
 
 func checkError(err error) {
@@ -63,8 +78,7 @@ func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 	if x >= W || y >= H {
 		return // ignore
 	}
-	pixelcnt++
-	/*	//sdlcol:=sdl.Color{R: uint8((color & 0xff0000) >> 16),G: uint8((color & 0xff00) >> 8), B: uint8(color & 0xff), A: uint8((color&0xff000000)>>24) }
+ 	/*	//sdlcol:=sdl.Color{R: uint8((color & 0xff0000) >> 16),G: uint8((color & 0xff00) >> 8), B: uint8(color & 0xff), A: uint8((color&0xff000000)>>24) }
 		gfx.PixelRGBA(ren,int32(x),int32(y),255,255,0,255) */
 	(*pixels)[y*W+x] = color //uint32((color & 0xff0000) >> 16) | uint32((color & 0xff00) >> 8) | uint32(color & 0xff)
 }
@@ -194,10 +208,12 @@ func windowInit() {
 	if err = sdl.Init(sdl.INIT_EVENTS | sdl.INIT_TIMER | sdl.INIT_VIDEO); err != nil {
 		panic(err)
 	}
-
+	displayBounds,err :=sdl.GetDisplayBounds(0)
+	checkError(err)
+	log.Printf("display: %v * %v",displayBounds.W, displayBounds.H)
 
 	window, err = sdl.CreateWindow("otterflut", 0, 0,
-		1900, 500, sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS|sdl.WINDOW_OPENGL)
+		displayBounds.W, displayBounds.H, sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS|sdl.WINDOW_OPENGL)
 	checkError(err)
 
 
@@ -258,6 +274,7 @@ func updater(gridx int) {
 	for ; running == true; {
 		for _, element := range lines {
 			pfparse(element)
+			pixelcnt[gridx]++
 		}
 		//running=false
 	}
@@ -268,7 +285,7 @@ func main() {
 	runtime.GOMAXPROCS(4 + runtime.NumCPU())
 
 
-	bdata, err := ioutil.ReadFile("small.pxfl")
+	bdata, err := ioutil.ReadFile("test.pxfl")
 	checkError(err)
 	s := string(bdata)
 	lines = strings.Split(s, "\n")
@@ -287,7 +304,7 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 	windowInit()
-	go printPixel(&pixelcnt)
+	go printPixel()
 	go printFps(&frames)
 
 
@@ -298,10 +315,10 @@ func main() {
 		}
 	}()
 
-	go updater(1)
-	//go updater(2)
-	//go updater(3)
-	//go updater(4)
+	for i:=0 ; i< numUpdater; i++ {
+		go updater(i)
+	}
+
 
 	sdlEventLoop()
 
