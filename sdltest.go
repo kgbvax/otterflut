@@ -193,7 +193,7 @@ func windowInit() {
 
 	sdl.SetHint("SDL_HINT_FRAMEBUFFER_ACCELERATION", "1")
 
-	numdrv, _ := sdl.GetNumRenderDrivers()
+	numdrv := sdl.GetNumRenderDrivers()
 	for i := 0; i < numdrv; i++ {
 		var rinfo sdl.RendererInfo
 		sdl.GetRenderDriverInfo(i, &rinfo)
@@ -205,15 +205,16 @@ func windowInit() {
 		}
 	}
 
-	if err = sdl.Init(sdl.INIT_EVENTS | sdl.INIT_TIMER | sdl.INIT_VIDEO); err != nil {
+	if err = sdl.Init(sdl.INIT_EVERYTHING); err != nil {
 		panic(err)
 	}
-	displayBounds,err :=sdl.GetDisplayBounds(0)
-	checkError(err)
+	var displayBounds sdl.Rect
+
+	sdl.GetDisplayBounds(0,&displayBounds)
 	log.Printf("display: %v * %v",displayBounds.W, displayBounds.H)
 
 	window, err = sdl.CreateWindow("otterflut", 0, 0,
-		displayBounds.W, displayBounds.H, sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS|sdl.WINDOW_OPENGL)
+		int(displayBounds.W), int(displayBounds.H), sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS|sdl.WINDOW_OPENGL)
 	checkError(err)
 
 
@@ -282,6 +283,10 @@ func updater(gridx int) {
 }
 
 func main() {
+	Server()
+}
+
+func xmain() {
 	runtime.GOMAXPROCS(4 + runtime.NumCPU())
 
 

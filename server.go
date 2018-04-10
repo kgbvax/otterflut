@@ -6,10 +6,9 @@ import (
 	"log"
 	"os/signal"
 	"syscall"
-
 	"fmt"
 	"bufio"
-
+	"time"
 )
 
 var port string = "1234"
@@ -21,8 +20,6 @@ func checkErr(err error) {
 		log.Fatal("ERROR:", err)
 	}
 }
-
-
 
 
 // acceptConns uses the semaphore channel on the counter to rate limit.
@@ -72,7 +69,7 @@ func handleConnection(conn net.Conn, counter *Counter) {
 	var s string
 	for scanner.Scan() {
 		s = scanner.Text()
-
+		log.Printf(s)
 
 		/* From here on out, we have a valid input. */
 		// Safely increment total counter.
@@ -88,7 +85,7 @@ func handleConnection(conn net.Conn, counter *Counter) {
 	}
 }
 
-func main() {
+func Server() {
 	hostname,_ := os.Hostname()
 	log.Printf("my hostname: %v",hostname)
 	addrs,_:= net.LookupHost(hostname)
@@ -106,11 +103,8 @@ func main() {
 	sig := make(chan os.Signal)
 	signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
 
-
-
 	// Set up intervals
-	go counter.RunOutputInterval(5)
-	go counter.RunLogInterval(5)
+	go counter.RunOutputInterval(5*time.Second)
 
 	// Receive new connections on an unbuffered channel.
 	conns := acceptConns(srv, counter)
