@@ -8,7 +8,6 @@ import (
 	"syscall"
 	"fmt"
 	"bufio"
-	"time"
 )
 
 var port string = "1234"
@@ -24,7 +23,7 @@ func checkErr(err error) {
 
 // acceptConns uses the semaphore channel on the counter to rate limit.
 // New connections get sent on the returned channel.
-func acceptConns(srv net.Listener, counter *Counter) <-chan net.Conn {
+func acceptConns(srv net.Listener) <-chan net.Conn {
 	conns := make(chan net.Conn)
 
 	go func() {
@@ -35,13 +34,7 @@ func acceptConns(srv net.Listener, counter *Counter) <-chan net.Conn {
 				continue
 			}
 
-			select {
-			case counter.Sem <- 1:
-				conns <- conn
-			default:
-				fmt.Fprintf(conn, "Server busy.")
-				conn.Close()
-			}
+			conns <- conn
 		}
 	}()
 
@@ -51,7 +44,7 @@ func acceptConns(srv net.Listener, counter *Counter) <-chan net.Conn {
 
 // Handles incoming requests.
 // Handles closing of the connection.
-func handleConnection(conn net.Conn, counter *Counter) {
+func handleConnection(conn net.Conn) {
 	// Defer all close logic.
 	// Using a closure makes it easy to group logic as well as execute serially
 	// and avoid the deferred LIFO exec order.
@@ -62,18 +55,16 @@ func handleConnection(conn net.Conn, counter *Counter) {
 		// Once our connection is closed,
 		// we can drain a value from our semaphore
 		// to free up a space in the connection limit.
-		<-counter.Sem
+
 	}()
 
 	scanner := bufio.NewScanner(conn)
 	var s string
 	for scanner.Scan() {
 		s = scanner.Text()
-		log.Printf(s)
+		pfparse(s)
 
-		/* From here on out, we have a valid input. */
-		// Safely increment total counter.
-		counter.Inc()
+
 
 	}
 
@@ -97,25 +88,20 @@ func Server() {
 	checkErr(err)
 	defer srv.Close()
 
-	counter := NewCounter(connLimit)
-
 	// Listen for termination signals.
 	sig := make(chan os.Signal)
 	signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
 
-	// Set up intervals
-	go counter.RunOutputInterval(5*time.Second)
 
 	// Receive new connections on an unbuffered channel.
-	conns := acceptConns(srv, counter)
+	conns := acceptConns(srv)
 	for {
 		select {
 		case conn := <-conns:
-			go handleConnection(conn, counter)
+			go handleConnection(conn)
 		case <-sig:
 			// Add a leading new line since the signal escape sequence prints on stdout.
 			fmt.Printf("\nShutting down server.\n")
-			counter.Close()
 			os.Exit(0)
 		}
 	}

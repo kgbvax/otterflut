@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"unsafe"
 	"github.com/dustin/go-humanize"
+	"sync/atomic"
 )
 
 type opix struct {
@@ -29,7 +30,7 @@ var lines []string
 
 const numUpdater int = 4
 
-var pixelcnt [numUpdater]int64
+var pixelcnt int64
 
 var pixels *[]uint32
 var running = true
@@ -48,13 +49,8 @@ func printPixel() {
 	for  running==true {
 		//start:=time.Now()
 		time.Sleep(time.Second * 1)
-		var total int64
-	    for i:=0 ; i< numUpdater; i++ {
-	    	total+=pixelcnt[i]
-	    	log.Printf("u-%v %v",i,humanize.Comma(pixelcnt[i]))
-	    	pixelcnt[i]=0
-		}
-		log.Printf("total %v",humanize.Comma( total))
+		log.Printf("%v",humanize.Comma(pixelcnt))
+		pixelcnt=0
 
 	//	pixelPerMsec:= pixelCount / int64(time.Since(start) / time.Millisecond)
 	//	log.Printf("px/s=%v",  humanize.Comma(pixelPerMsec*1000))
@@ -275,18 +271,15 @@ func updater(gridx int) {
 	for ; running == true; {
 		for _, element := range lines {
 			pfparse(element)
-			pixelcnt[gridx]++
+			atomic.AddInt64(&pixelcnt,1)
 		}
-		//running=false
 	}
 	runtime.UnlockOSThread()
 }
 
-func main() {
-	Server()
-}
 
-func xmain() {
+
+func main() {
 	runtime.GOMAXPROCS(4 + runtime.NumCPU())
 
 
@@ -320,11 +313,11 @@ func xmain() {
 		}
 	}()
 
-	for i:=0 ; i< numUpdater; i++ {
-		go updater(i)
-	}
+	//for i:=0 ; i< numUpdater; i++ {
+	//	go updater(i)
+	//}
 
-
+	Server()
 	sdlEventLoop()
 
 }
