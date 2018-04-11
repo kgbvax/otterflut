@@ -189,7 +189,7 @@ func windowInit() {
 
 	sdl.SetHint("SDL_HINT_FRAMEBUFFER_ACCELERATION", "1")
 
-	numdrv := sdl.GetNumRenderDrivers()
+	numdrv,_ := sdl.GetNumRenderDrivers()
 	for i := 0; i < numdrv; i++ {
 		var rinfo sdl.RendererInfo
 		sdl.GetRenderDriverInfo(i, &rinfo)
@@ -204,13 +204,12 @@ func windowInit() {
 	if err = sdl.Init(sdl.INIT_EVERYTHING); err != nil {
 		panic(err)
 	}
-	var displayBounds sdl.Rect
 
-	sdl.GetDisplayBounds(0,&displayBounds)
+	displayBounds,_ := sdl.GetDisplayBounds(0)
 	log.Printf("display: %v * %v",displayBounds.W, displayBounds.H)
 
 	window, err = sdl.CreateWindow("otterflut", 0, 0,
-		int(displayBounds.W), int(displayBounds.H), sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS|sdl.WINDOW_OPENGL)
+		 displayBounds.W,  displayBounds.H, sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS|sdl.WINDOW_OPENGL)
 	checkError(err)
 
 
