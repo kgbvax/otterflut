@@ -313,11 +313,11 @@ func main() {
 		}
 	}()
 
-	//for i:=0 ; i< numUpdater; i++ {
-	//	go updater(i)
-	//}
+	for i:=0 ; i< numUpdater; i++ {
+		go updater(i)
+	}
 
-	Server()
+	//Server()
 	sdlEventLoop()
 
 }
