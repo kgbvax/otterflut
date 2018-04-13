@@ -1,18 +1,18 @@
 package main
 
 import (
-	"github.com/veandco/go-sdl2/sdl"
-	"time"
-	"log"
-	"strings"
 	"flag"
-	"os"
-	"runtime/pprof"
-	"io/ioutil"
-	"runtime"
-	"unsafe"
 	"github.com/dustin/go-humanize"
+	"github.com/veandco/go-sdl2/sdl"
+	"io/ioutil"
+	"log"
+	"os"
+	"runtime"
+	"runtime/pprof"
+	"strings"
 	"sync/atomic"
+	"time"
+	"unsafe"
 )
 
 type opix struct {
@@ -46,15 +46,15 @@ func printFps(frames *uint64) {
 
 func printPixel() {
 	runtime.LockOSThread()
-	for  running==true {
+	for running == true {
 		//start:=time.Now()
 		time.Sleep(time.Second * 1)
-		log.Printf("%v",humanize.Comma(pixelcnt))
-		pixelcnt=0
+		log.Printf("%v", humanize.Comma(pixelcnt))
+		pixelcnt = 0
 
-	//	pixelPerMsec:= pixelCount / int64(time.Since(start) / time.Millisecond)
-	//	log.Printf("px/s=%v",  humanize.Comma(pixelPerMsec*1000))
-	//	*pixelcnt = 0
+		//	pixelPerMsec:= pixelCount / int64(time.Since(start) / time.Millisecond)
+		//	log.Printf("px/s=%v",  humanize.Comma(pixelPerMsec*1000))
+		//	*pixelcnt = 0
 	}
 	runtime.UnlockOSThread()
 }
@@ -74,7 +74,7 @@ func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 	if x >= W || y >= H {
 		return // ignore
 	}
- 	/*	//sdlcol:=sdl.Color{R: uint8((color & 0xff0000) >> 16),G: uint8((color & 0xff00) >> 8), B: uint8(color & 0xff), A: uint8((color&0xff000000)>>24) }
+	/*	//sdlcol:=sdl.Color{R: uint8((color & 0xff0000) >> 16),G: uint8((color & 0xff00) >> 8), B: uint8(color & 0xff), A: uint8((color&0xff000000)>>24) }
 		gfx.PixelRGBA(ren,int32(x),int32(y),255,255,0,255) */
 	(*pixels)[y*W+x] = color //uint32((color & 0xff0000) >> 16) | uint32((color & 0xff00) >> 8) | uint32(color & 0xff)
 }
@@ -189,7 +189,7 @@ func windowInit() {
 
 	sdl.SetHint("SDL_HINT_FRAMEBUFFER_ACCELERATION", "1")
 
-	numdrv,_ := sdl.GetNumRenderDrivers()
+	numdrv, _ := sdl.GetNumRenderDrivers()
 	for i := 0; i < numdrv; i++ {
 		var rinfo sdl.RendererInfo
 		sdl.GetRenderDriverInfo(i, &rinfo)
@@ -205,13 +205,12 @@ func windowInit() {
 		panic(err)
 	}
 
-	displayBounds,_ := sdl.GetDisplayBounds(0)
-	log.Printf("display: %v * %v",displayBounds.W, displayBounds.H)
+	displayBounds, _ := sdl.GetDisplayBounds(0)
+	log.Printf("display: %v * %v", displayBounds.W, displayBounds.H)
 
 	window, err = sdl.CreateWindow("otterflut", 0, 0,
-		 displayBounds.W,  displayBounds.H, sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS|sdl.WINDOW_OPENGL)
+		displayBounds.W, displayBounds.H, sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS|sdl.WINDOW_OPENGL)
 	checkError(err)
-
 
 	surface, err := window.GetSurface()
 	checkError(err)
@@ -237,7 +236,7 @@ func updateWin() {
 }
 
 func sdlEventLoop() {
-	for running==true {
+	for running == true {
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 			//log.Print(event)
 			switch event.(type) {
@@ -263,24 +262,21 @@ func sdlEventLoop() {
 
 func updater(gridx int) {
 	runtime.LockOSThread()
-	for pixels==nil { //wait for bitmap to become available
+	for pixels == nil { //wait for bitmap to become available
 		runtime.Gosched()
 	}
 
-	for ; running == true; {
+	for running == true {
 		for _, element := range lines {
 			pfparse(element)
-			atomic.AddInt64(&pixelcnt,1)
+			atomic.AddInt64(&pixelcnt, 1)
 		}
 	}
 	runtime.UnlockOSThread()
 }
 
-
-
 func main() {
 	runtime.GOMAXPROCS(4 + runtime.NumCPU())
-
 
 	bdata, err := ioutil.ReadFile("test.pxfl")
 	checkError(err)
@@ -304,15 +300,14 @@ func main() {
 	go printPixel()
 	go printFps(&frames)
 
-
 	ticker := time.NewTicker(1000 / 30 * time.Millisecond) //target 30fps
 	go func() {
-		for  range ticker.C {
-			 updateWin()
+		for range ticker.C {
+			updateWin()
 		}
 	}()
 
-	for i:=0 ; i< numUpdater; i++ {
+	for i := 0; i < numUpdater; i++ {
 		go updater(i)
 	}
 
