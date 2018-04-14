@@ -4,15 +4,15 @@ import (
 	"flag"
 	"github.com/dustin/go-humanize"
 	"github.com/veandco/go-sdl2/sdl"
-	"io/ioutil"
 	"log"
 	"os"
 	"runtime"
 	"runtime/pprof"
-	"strings"
 	"sync/atomic"
 	"time"
 	"unsafe"
+	"io/ioutil"
+	"strings"
 )
 
 type opix struct {
@@ -28,7 +28,7 @@ var H uint32 = 968
 
 var lines []string
 
-const numUpdater int = 4
+const numSimUpdater int = 0
 
 var pixelcnt int64
 
@@ -37,10 +37,12 @@ var running = true
 var window *sdl.Window
 
 func printFps(frames *uint64) {
-	for {
-		time.Sleep(time.Second * 1)
-		log.Printf("frames=%d\b", *frames)
-		*frames = 0
+	for running == true {
+		for {
+			time.Sleep(time.Second * 1)
+			log.Printf("frames=%d\b", *frames)
+			*frames = 0
+		}
 	}
 }
 
@@ -77,6 +79,8 @@ func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 	/*	//sdlcol:=sdl.Color{R: uint8((color & 0xff0000) >> 16),G: uint8((color & 0xff00) >> 8), B: uint8(color & 0xff), A: uint8((color&0xff000000)>>24) }
 		gfx.PixelRGBA(ren,int32(x),int32(y),255,255,0,255) */
 	(*pixels)[y*W+x] = color //uint32((color & 0xff0000) >> 16) | uint32((color & 0xff00) >> 8) | uint32(color & 0xff)
+	atomic.AddInt64(&pixelcnt, 1)
+
 }
 
 //find next 'field' quickly ;-)
@@ -134,29 +138,28 @@ func pfparse(m string) {
 	//0 -> "PX"
 	//1&2 -> x & y (dec)
 	//3 -> Color(hex)
-	if m[0] == 'P' { // we only test for the first "P" on purpose.
 
-		var color uint32
+	var color uint32
 
-		start, end := nextNonWs(m, 3)
-		x := parsUint(m[start:end])
+	start, end := nextNonWs(m, 3)
+	x := parsUint(m[start:end])
 
-		start, end = nextNonWs(m, end)
-		y := parsUint(m[start:end])
+	start, end = nextNonWs(m, end)
+	y := parsUint(m[start:end])
 
-		start, end = nextNonWs(m, end)
-		hexstr := m[start:end]
+	start, end = nextNonWs(m, end)
+	hexstr := m[start:end]
 
-		if len(hexstr) == 6 {
-			color = parseHex3(hexstr)
-		} else if len(hexstr) == 8 {
-			color = parseHex4(hexstr)
-		} else {
-			//huh?
-			return
-		}
-		setPixel(x, y, color)
-	} //else TODO
+	if len(hexstr) == 6 {
+		color = parseHex3(hexstr)
+	} else if len(hexstr) == 8 {
+		color = parseHex4(hexstr)
+	} else {
+		//huh?
+		log.Printf("does not understand %v", m)
+		return
+	}
+	setPixel(x, y, color)
 }
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
@@ -220,6 +223,7 @@ func windowInit() {
 	W = uint32(surface.W)
 	H = uint32(surface.H)
 
+	//extract []unit32 pixel buffer from window
 	pixelsPtr := uintptr(surface.Data())
 	pixelsSlice := struct {
 		addr uintptr
@@ -257,6 +261,7 @@ func sdlEventLoop() {
 				break
 			}
 		}
+		time.Sleep(200*time.Millisecond)
 	}
 }
 
@@ -276,7 +281,7 @@ func updater(gridx int) {
 }
 
 func main() {
-	runtime.GOMAXPROCS(4 + runtime.NumCPU())
+	runtime.GOMAXPROCS(8 + runtime.NumCPU())
 
 	bdata, err := ioutil.ReadFile("test.pxfl")
 	checkError(err)
@@ -290,11 +295,13 @@ func main() {
 		if err != nil {
 			log.Fatal("could not create CPU profile: ", err)
 		}
+		pprof.StopCPUProfile()
+
 		if err := pprof.StartCPUProfile(f); err != nil {
 			log.Fatal("could not start CPU profile: ", err)
 		}
-
-		defer pprof.StopCPUProfile()
+		runtime.SetCPUProfileRate(400)
+ 		defer pprof.StopCPUProfile()
 	}
 	windowInit()
 	go printPixel()
@@ -307,11 +314,11 @@ func main() {
 		}
 	}()
 
-	for i := 0; i < numUpdater; i++ {
+
+
+	go Server()
+	for i := 0; i < numSimUpdater; i++ {
 		go updater(i)
 	}
-
-	//Server()
 	sdlEventLoop()
-
 }
