@@ -309,7 +309,6 @@ func memProfileWriter() {
 		}
 		pprof.WriteHeapProfile(f)
 		f.Close()
-		return
 	}
 }
 
