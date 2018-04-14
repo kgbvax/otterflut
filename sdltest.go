@@ -13,6 +13,7 @@ import (
 	"unsafe"
 	"io/ioutil"
 	"strings"
+	"math/rand"
 )
 
 type opix struct {
@@ -28,7 +29,9 @@ var H uint32 = 968
 
 var lines []string
 
-const numSimUpdater int = 0
+const numSimUpdater int = 4
+
+
 
 var pixelCnt int64
 var totalPixelCnt int64
@@ -83,6 +86,7 @@ func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 	/*	//sdlcol:=sdl.Color{R: uint8((color & 0xff0000) >> 16),G: uint8((color & 0xff00) >> 8), B: uint8(color & 0xff), A: uint8((color&0xff000000)>>24) }
 		gfx.PixelRGBA(ren,int32(x),int32(y),255,255,0,255) */
 	(*pixels)[y*W+x] = color //uint32((color & 0xff0000) >> 16) | uint32((color & 0xff00) >> 8) | uint32(color & 0xff)
+
 	atomic.AddInt64(&pixelCnt, 1)
 
 }
@@ -288,12 +292,13 @@ func updateSim(gridx int) {
 			pfparse(element)
 			atomic.AddInt64(&pixelCnt, 1)
 		}
+		time.Sleep(time.Duration( rand.Int63n(10))*time.Millisecond)  // some random delay
 	}
 	runtime.UnlockOSThread()
 }
 
 func main() {
-	runtime.GOMAXPROCS(8 + runtime.NumCPU())
+	runtime.GOMAXPROCS(16 + runtime.NumCPU())
 
 	bdata, err := ioutil.ReadFile("test.pxfl")
 	checkError(err)
@@ -330,7 +335,7 @@ func main() {
 
 	go Server()
 
-	//simualted messages
+	//simulated messages
 	for i := 0; i < numSimUpdater; i++ {
 		go updateSim(i)
 	}
