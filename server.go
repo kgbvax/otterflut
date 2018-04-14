@@ -117,16 +117,15 @@ func Server(quit chan int) { //todo add mechanism to terminate, channel?
 			go handleConnection(conn)
 
 		case <-quit:
-			log.Print("recieved quit.")
+			log.Print("Server quit.")
 			srv.Close()
-			log.Print("Shutting down server.")
-			return
 
 		case <-sig:
+			log.Print("Shutting down server.")
 			// Add a leading new line since the signal escape sequence prints on stdout.
 			stopRunning()
 			srv.Close()
-			log.Print("Shutting down server.")
+
 			return
 		}
 	}

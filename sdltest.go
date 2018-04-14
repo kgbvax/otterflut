@@ -212,6 +212,7 @@ func windowInit() {
 	if err = sdl.Init(sdl.INIT_EVERYTHING); err != nil {
 		panic(err)
 	}
+	sdl.DisableScreenSaver()
 
 	displayBounds, _ := sdl.GetDisplayBounds(0)
 	log.Printf("display: %v * %v", displayBounds.W, displayBounds.H)
@@ -242,11 +243,17 @@ func windowInit() {
 
 func isRunning() bool {
 	return xrunning
-
 }
 
 func stopRunning() {
-	xrunning = false
+	if isRunning() {
+		xrunning = false
+		serverQuit <- 1
+		if window != nil {
+			log.Print("window destroy")
+			window.Destroy()
+		}
+	}
 }
 
 func updateWin() {
@@ -255,16 +262,15 @@ func updateWin() {
 }
 
 func sdlEventLoop() {
-		for event := sdl.WaitEventTimeout(100); isRunning() && event != nil ; event = sdl.WaitEvent() {
-			//log.Print(event)
-			switch event.(type) {
-			case *sdl.QuitEvent:
-				println("Quit")
-				serverQuit <- 1
-				stopRunning()
-				return
-			}
+	for event := sdl.WaitEventTimeout(100); isRunning() && event != nil; event = sdl.WaitEvent() {
+		//log.Print(event)
+		switch event.(type) {
+		case *sdl.QuitEvent:
+			println("SDL Quit")
+			stopRunning()
+			return
 		}
+	}
 }
 
 func updateSim(gridx int) {
