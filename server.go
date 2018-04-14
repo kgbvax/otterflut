@@ -86,7 +86,6 @@ func handleConnection(conn net.Conn) {
 
 	// If a failure to read input occurs,
 	// it's probably my bad.
-	// Fail and figure it out if so!
 	if err := scanner.Err(); err != nil {
 		log.Fatalf("Error reading: %v", err) // TODO don't just kick the bucket
 	}
