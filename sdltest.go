@@ -196,15 +196,8 @@ func windowInit() {
 	var err error
 
 	sdl.SetHint("SDL_HINT_FRAMEBUFFER_ACCELERATION", "1")
-	os.Setenv("SDL_VIDEODRIVER","fbcon")
-	numDisplays,err := sdl.GetNumVideoDisplays()
-	checkErr(err)
-	log.Printf("num video displays: %v",numDisplays)
-	for i:=0;i<numDisplays;i++ {
-		displayName,err:= sdl.GetDisplayName(i)
-		checkErr(err)
-		log.Printf("video display %v:%v",i,displayName)
-	}
+
+
 
 	numdrv, _ := sdl.GetNumRenderDrivers()
 	for i := 0; i < numdrv; i++ {
