@@ -83,7 +83,7 @@ func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 	/*	//sdlcol:=sdl.Color{R: uint8((color & 0xff0000) >> 16),G: uint8((color & 0xff00) >> 8), B: uint8(color & 0xff), A: uint8((color&0xff000000)>>24) }
 		gfx.PixelRGBA(ren,int32(x),int32(y),255,255,0,255) */
 	(*pixels)[y*W+x] = color //uint32((color & 0xff0000) >> 16) | uint32((color & 0xff00) >> 8) | uint32(color & 0xff)
-	atomic.AddInt64(&pixelcnt, 1)
+	atomic.AddInt64(&pixelCnt, 1)
 
 }
 
