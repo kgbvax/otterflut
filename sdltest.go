@@ -259,7 +259,7 @@ func updateWin() {
 
 func sdlEventLoop() {
 	for isRunning()  {
-		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+		for event := sdl.WaitEvent(); event != nil; event = sdl.WaitEvent() {
 			//log.Print(event)
 			switch event.(type) {
 			case *sdl.QuitEvent:
@@ -279,8 +279,7 @@ func sdlEventLoop() {
 				break
 			}
 		}
-		time.Sleep(100*time.Millisecond)
-	}
+ 	}
 }
 
 func updateSim(gridx int) {
@@ -299,9 +298,10 @@ func updateSim(gridx int) {
 	runtime.UnlockOSThread()
 }
 
+//take 10 memory profiles every 5 seconds
 func memProfileWriter() {
 	for i:=0;i<10;i++ {
-		time.Sleep(2*time.Second)
+		time.Sleep(5*time.Second)
 		memprofileFn:="memprofile.pprof."+strconv.Itoa(i)
 		f, err := os.Create(memprofileFn)
 		if err != nil {
