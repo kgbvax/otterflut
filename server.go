@@ -28,7 +28,8 @@ func acceptConns(srv net.Listener) <-chan net.Conn {
 	conns := make(chan net.Conn)
 
 	go func() {
-		for {
+		for isRunning() {
+
 			conn, err := srv.Accept()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error accepting connection: %v\n", err)
@@ -54,13 +55,14 @@ func handleConnection(conn net.Conn) {
 		conn.Close()
 	}()
 
-	log.Printf("handle connection")
+
 	scanner := bufio.NewScanner(conn)
 	var s string
-	for scanner.Scan() {
+	for scanner.Scan() { //TODO this most likely needs tuning
 		s = scanner.Text()
 
-		if len(s) > 1 && s[0] == 'P' { // we only test for the first "P" on purpose.
+		if len(s) > 1 && //we can save the len test if this becomes a gurantee of the "scanning"
+			s[0] == 'P' { // we only test for the first "P" on purpose.
 			pfparse(s)
 			//log.Printf("parsed %v",s)
 		} else {
@@ -72,9 +74,10 @@ func handleConnection(conn net.Conn) {
 				hostname, _ := os.Hostname()
 				HELP := "OTTERFLUT (github.com/kgbvax/otterflut) on " + hostname + " (" + runtime.GOARCH + "/" + runtime.Version() +
 					")\nCommands:\n" +
-					"'PX x y rrggb' where x.y = dec integer and colors are hex\n" +
+					"'PX x y rrggbb' set a pixel, where x,y = decimal postitive integer and colors are hex, hex values need leading zeros\n" +
 					"'HELP' - this text\n" +
-					"'SIZE' - get canvas size ,responds with 'SIZE X Y'\n"
+					"'SIZE' - get canvas size ,responds with 'SIZE X Y'\n"+
+					"\nReading pixels is not supported, alpha is not implemented yet\n"
 				conn.Write([]byte(HELP))
 
 			}
@@ -114,7 +117,7 @@ func Server() {
 			go handleConnection(conn)
 		case <-sig:
 			// Add a leading new line since the signal escape sequence prints on stdout.
-			running = false
+			stopRunning()
 			srv.Close()
 			fmt.Printf("\nShutting down server.\n")
 			return

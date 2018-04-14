@@ -33,37 +33,37 @@ const numSimUpdater int = 0
 var pixelcnt int64
 
 var pixels *[]uint32
-var running = true
+var xrunning int32 = 1
 var window *sdl.Window
 
-func printFps(frames *uint64) {
-	for running == true {
+var frames uint64
+
+
+func printFps() {
+	for isRunning() {
 		for {
 			time.Sleep(time.Second * 1)
-			log.Printf("frames=%d\b", *frames)
-			*frames = 0
+			log.Printf("frames=%v\b", atomic.LoadUint64(&frames))
+
+			atomic.StoreUint64(&frames,0)
 		}
 	}
 }
 
 func printPixel() {
 	runtime.LockOSThread()
-	for running == true {
+	for isRunning() {
 		//start:=time.Now()
 		time.Sleep(time.Second * 1)
-		log.Printf("%v", humanize.Comma(pixelcnt))
-		pixelcnt = 0
+		log.Printf("%v", humanize.Comma(atomic.LoadInt64(&pixelcnt)))
 
-		//	pixelPerMsec:= pixelCount / int64(time.Since(start) / time.Millisecond)
-		//	log.Printf("px/s=%v",  humanize.Comma(pixelPerMsec*1000))
-		//	*pixelcnt = 0
+		atomic.StoreInt64(&pixelcnt,0)
 	}
 	runtime.UnlockOSThread()
 }
 
 //stats
 
-var frames uint64
 
 func checkError(err error) {
 	if err != nil {
@@ -234,19 +234,27 @@ func windowInit() {
 
 }
 
+func isRunning() bool {
+	return  atomic.LoadInt32(&xrunning)==1
+}
+
+func stopRunning() {
+	atomic.StoreInt32(&xrunning,0)
+}
+
 func updateWin() {
-	frames++
+	atomic.AddUint64(&frames,1)
 	window.UpdateSurface()
 }
 
 func sdlEventLoop() {
-	for running == true {
+	for isRunning()  {
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 			//log.Print(event)
 			switch event.(type) {
 			case *sdl.QuitEvent:
 				println("Quit")
-				running = false
+				stopRunning()
 				if *memprofile != "" {
 					f, err := os.Create(*memprofile)
 					if err != nil {
@@ -271,7 +279,7 @@ func updater(gridx int) {
 		runtime.Gosched()
 	}
 
-	for running == true {
+	for isRunning() {
 		for _, element := range lines {
 			pfparse(element)
 			atomic.AddInt64(&pixelcnt, 1)
@@ -305,7 +313,7 @@ func main() {
 	}
 	windowInit()
 	go printPixel()
-	go printFps(&frames)
+	go printFps()
 
 	ticker := time.NewTicker(1000 / 30 * time.Millisecond) //target 30fps
 	go func() {
