@@ -33,46 +33,43 @@ var lines []string
 
 const numSimUpdater int = 4
 
-
-
 var pixelCnt int64
 var totalPixelCnt int64
 
 var pixels *[]uint32
-var xrunning int32 = 1
+var xrunning bool = true
 var window *sdl.Window
 
 var frames uint64
 var errorCnt int64
 
+var serverQuit chan int = make(chan int)
 
 func printFps() {
-	for isRunning() {
-		for {
-			time.Sleep(time.Second * 1)
-			log.Printf("frames=%v\b", atomic.LoadUint64(&frames))
 
-			atomic.StoreUint64(&frames,0)
-		}
+	for isRunning() {
+		time.Sleep(time.Second * 1)
+		log.Printf("frames=%v\b", atomic.LoadUint64(&frames))
+
+		atomic.StoreUint64(&frames, 0)
 	}
+	log.Print("Exit printFps")
 }
 
 func printPixel() {
 	runtime.LockOSThread()
 	for isRunning() {
-		//start:=time.Now()
 		time.Sleep(time.Second * 1)
 		pixelCount := atomic.LoadInt64(&pixelCnt)
 		log.Printf("%v", humanize.Comma(pixelCount))
 
-		atomic.StoreInt64(&pixelCnt,0)
-		atomic.AddInt64(&totalPixelCnt,pixelCount)
+		atomic.StoreInt64(&pixelCnt, 0)
+		atomic.AddInt64(&totalPixelCnt, pixelCount)
 	}
 	runtime.UnlockOSThread()
 }
 
 //stats
-
 
 func checkError(err error) {
 	if err != nil {
@@ -165,7 +162,7 @@ func pfparse(m string) {
 	} else if len(hexstr) == 8 {
 		color = parseHex4(hexstr)
 	} else {
-		atomic.AddInt64(&errorCnt,1)
+		atomic.AddInt64(&errorCnt, 1)
 		return
 	}
 	setPixel(x, y, color)
@@ -221,7 +218,7 @@ func windowInit() {
 
 	window, err = sdl.CreateWindow("otterflut", 0, 0,
 		displayBounds.W, displayBounds.H,
-		sdl.WINDOW_SHOWN | sdl.WINDOW_ALLOW_HIGHDPI | sdl.WINDOW_BORDERLESS /*|sdl.WINDOW_OPENGL*/)
+		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS /*|sdl.WINDOW_OPENGL*/)
 	checkError(err)
 
 	surface, err := window.GetSurface()
@@ -244,42 +241,30 @@ func windowInit() {
 }
 
 func isRunning() bool {
-	return  atomic.LoadInt32(&xrunning)==1
+	return xrunning
+
 }
 
 func stopRunning() {
-	atomic.StoreInt32(&xrunning,0)
+	xrunning = false
 }
 
 func updateWin() {
-	atomic.AddUint64(&frames,1)
+	atomic.AddUint64(&frames, 1)
 	window.UpdateSurface()
 }
 
-
 func sdlEventLoop() {
-	for isRunning()  {
-		for event := sdl.WaitEvent(); event != nil; event = sdl.WaitEvent() {
+		for event := sdl.WaitEventTimeout(100); isRunning() && event != nil ; event = sdl.WaitEvent() {
 			//log.Print(event)
 			switch event.(type) {
 			case *sdl.QuitEvent:
 				println("Quit")
+				serverQuit <- 1
 				stopRunning()
-				if *memprofile != "" {
-					f, err := os.Create(*memprofile)
-					if err != nil {
-						log.Fatal("could not create memory profile: ", err)
-					}
-					runtime.GC() // get up-to-date statistics
-					if err := pprof.WriteHeapProfile(f); err != nil {
-						log.Fatal("could not write memory profile: ", err)
-					}
-					f.Close()
-				}
-				break
+				return
 			}
 		}
- 	}
 }
 
 func updateSim(gridx int) {
@@ -293,16 +278,17 @@ func updateSim(gridx int) {
 			pfparse(element)
 			atomic.AddInt64(&pixelCnt, 1)
 		}
-		time.Sleep(time.Duration( rand.Int63n(10))*time.Millisecond)  // some random delay
+		time.Sleep(time.Duration(rand.Int63n(10)) * time.Millisecond) // some random delay
 	}
+	log.Printf("Exit updateSim %v", gridx)
 	runtime.UnlockOSThread()
 }
 
 //take 10 memory profiles every 5 seconds
 func memProfileWriter() {
-	for i:=0;i<10;i++ {
-		time.Sleep(5*time.Second)
-		memprofileFn:="memprofile.pprof."+strconv.Itoa(i)
+	for i := 0; i < 10; i++ {
+		time.Sleep(5 * time.Second)
+		memprofileFn := "memprofile.pprof." + strconv.Itoa(i)
 		f, err := os.Create(memprofileFn)
 		if err != nil {
 			log.Fatal(err)
@@ -321,7 +307,6 @@ func main() {
 	lines = strings.Split(s, "\n")
 	//log.Println(http.ListenAndServe("localhost:6060", nil))
 
-
 	flag.Parse()
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
@@ -333,13 +318,12 @@ func main() {
 		if err := pprof.StartCPUProfile(f); err != nil {
 			log.Fatal("could not start CPU profile: ", err)
 		}
-		runtime.SetCPUProfileRate(200)
- 		defer pprof.StopCPUProfile()
+
+		defer pprof.StopCPUProfile()
 	}
 	if *memprofile != "" {
 		go memProfileWriter()
 	}
-
 
 	windowInit()
 	go printPixel()
@@ -348,17 +332,23 @@ func main() {
 	ticker := time.NewTicker(1000 / 30 * time.Millisecond) //target 30fps
 	go func() {
 		for range ticker.C {
-			updateWin()
+			if isRunning() {
+				updateWin()
+			} else {
+				log.Print("Exit Window update ticker")
+				return //the end
+			}
 		}
 	}()
 
-
-
-	go Server()
+	go Server(serverQuit)
 
 	//simulated messages
 	for i := 0; i < numSimUpdater; i++ {
 		go updateSim(i)
 	}
 	sdlEventLoop()
+
+	(*window).Destroy()
+
 }

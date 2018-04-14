@@ -91,7 +91,7 @@ func handleConnection(conn net.Conn) {
 	}
 }
 
-func Server() {
+func Server(quit chan int) { //todo add mechanism to terminate, channel?
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
@@ -108,17 +108,25 @@ func Server() {
 	sig := make(chan os.Signal)
 	signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
 
+
 	// Receive new connections on an unbuffered channel.
 	conns := acceptConns(srv)
 	for {
 		select {
 		case conn := <-conns:
 			go handleConnection(conn)
+
+		case <-quit:
+			log.Print("recieved quit.")
+			srv.Close()
+			log.Print("Shutting down server.")
+			return
+
 		case <-sig:
 			// Add a leading new line since the signal escape sequence prints on stdout.
 			stopRunning()
 			srv.Close()
-			fmt.Printf("\nShutting down server.\n")
+			log.Print("Shutting down server.")
 			return
 		}
 	}
