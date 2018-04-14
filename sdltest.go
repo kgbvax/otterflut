@@ -30,13 +30,15 @@ var lines []string
 
 const numSimUpdater int = 0
 
-var pixelcnt int64
+var pixelCnt int64
+var totalPixelCnt int64
 
 var pixels *[]uint32
 var xrunning int32 = 1
 var window *sdl.Window
 
 var frames uint64
+var errorCnt int64
 
 
 func printFps() {
@@ -55,9 +57,11 @@ func printPixel() {
 	for isRunning() {
 		//start:=time.Now()
 		time.Sleep(time.Second * 1)
-		log.Printf("%v", humanize.Comma(atomic.LoadInt64(&pixelcnt)))
+		pixelCount := atomic.LoadInt64(&pixelCnt)
+		log.Printf("%v", humanize.Comma(pixelCount))
 
-		atomic.StoreInt64(&pixelcnt,0)
+		atomic.StoreInt64(&pixelCnt,0)
+		atomic.AddInt64(&totalPixelCnt,pixelCount)
 	}
 	runtime.UnlockOSThread()
 }
@@ -107,7 +111,7 @@ var hexval = [256]uint8{'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5,
 
 //quickly  parse a 3 byte hex number
 func parseHex3(m string) uint32 {
-	//MUL version
+	//MUL version, compiles to shifts
 	return 0x100000*uint32(hexval[m[0]]) + 0x010000*uint32(hexval[m[1]]) + 0x001000*uint32(hexval[m[2]]) +
 		0x000100*uint32(hexval[m[3]]) + 0x000010*uint32(hexval[m[4]]) + uint32(hexval[m[5]])
 }
@@ -155,8 +159,7 @@ func pfparse(m string) {
 	} else if len(hexstr) == 8 {
 		color = parseHex4(hexstr)
 	} else {
-		//huh?
-		log.Printf("does not understand %v", m)
+		atomic.AddInt64(&errorCnt,1)
 		return
 	}
 	setPixel(x, y, color)
@@ -165,8 +168,7 @@ func pfparse(m string) {
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
 var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
 
-func printInfo(sur *sdl.Surface, name string) {
-	log.Print("foo")
+func printSurfaceInfo(sur *sdl.Surface, name string) {
 	var formatName = "-"
 	if sur == nil {
 		log.Print("surface is nil")
@@ -212,13 +214,14 @@ func windowInit() {
 	log.Printf("display: %v * %v", displayBounds.W, displayBounds.H)
 
 	window, err = sdl.CreateWindow("otterflut", 0, 0,
-		displayBounds.W, displayBounds.H, sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS|sdl.WINDOW_OPENGL)
+		displayBounds.W, displayBounds.H,
+		sdl.WINDOW_SHOWN | sdl.WINDOW_ALLOW_HIGHDPI | sdl.WINDOW_BORDERLESS /*|sdl.WINDOW_OPENGL*/)
 	checkError(err)
 
 	surface, err := window.GetSurface()
 	checkError(err)
 
-	printInfo(surface, "window")
+	printSurfaceInfo(surface, "window")
 
 	W = uint32(surface.W)
 	H = uint32(surface.H)
@@ -247,6 +250,7 @@ func updateWin() {
 	window.UpdateSurface()
 }
 
+
 func sdlEventLoop() {
 	for isRunning()  {
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
@@ -269,11 +273,11 @@ func sdlEventLoop() {
 				break
 			}
 		}
-		time.Sleep(200*time.Millisecond)
+		time.Sleep(100*time.Millisecond)
 	}
 }
 
-func updater(gridx int) {
+func updateSim(gridx int) {
 	runtime.LockOSThread()
 	for pixels == nil { //wait for bitmap to become available
 		runtime.Gosched()
@@ -282,7 +286,7 @@ func updater(gridx int) {
 	for isRunning() {
 		for _, element := range lines {
 			pfparse(element)
-			atomic.AddInt64(&pixelcnt, 1)
+			atomic.AddInt64(&pixelCnt, 1)
 		}
 	}
 	runtime.UnlockOSThread()
@@ -325,8 +329,10 @@ func main() {
 
 
 	go Server()
+
+	//simualted messages
 	for i := 0; i < numSimUpdater; i++ {
-		go updater(i)
+		go updateSim(i)
 	}
 	sdlEventLoop()
 }
