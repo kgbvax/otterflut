@@ -14,6 +14,8 @@ import (
 	"io/ioutil"
 	"strings"
 	"math/rand"
+	_ "net/http/pprof"
+	"strconv"
 )
 
 type opix struct {
@@ -297,6 +299,20 @@ func updateSim(gridx int) {
 	runtime.UnlockOSThread()
 }
 
+func memProfileWriter() {
+	for i:=0;i<10;i++ {
+		time.Sleep(2*time.Second)
+		memprofileFn:="memprofile.pprof."+strconv.Itoa(i)
+		f, err := os.Create(memprofileFn)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.WriteHeapProfile(f)
+		f.Close()
+		return
+	}
+}
+
 func main() {
 	runtime.GOMAXPROCS(16 + runtime.NumCPU())
 
@@ -305,6 +321,7 @@ func main() {
 	s := string(bdata)
 	lines = strings.Split(s, "\n")
 	//log.Println(http.ListenAndServe("localhost:6060", nil))
+
 
 	flag.Parse()
 	if *cpuprofile != "" {
@@ -317,9 +334,14 @@ func main() {
 		if err := pprof.StartCPUProfile(f); err != nil {
 			log.Fatal("could not start CPU profile: ", err)
 		}
-		runtime.SetCPUProfileRate(400)
+		runtime.SetCPUProfileRate(200)
  		defer pprof.StopCPUProfile()
 	}
+	if *memprofile != "" {
+		go memProfileWriter()
+	}
+
+
 	windowInit()
 	go printPixel()
 	go printFps()
