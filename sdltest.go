@@ -31,9 +31,12 @@ var H uint32 = 968
 
 var lines []string
 
-const numSimUpdater int = 2
 
-var pixelCnt int64
+const numSimUpdater int = 4
+
+var pixelCntSli [numSimUpdater]int64
+
+var pixelXXCnt int64
 var totalPixelCnt int64
 
 var pixels *[]uint32
@@ -64,11 +67,16 @@ func printPixel() {
 	runtime.LockOSThread()
 	for isRunning() {
 		time.Sleep(time.Second * 1)
-		pixelCount := atomic.LoadInt64(&pixelCnt)
-		log.Printf("%v", humanize.Comma(pixelCount))
+		var sumPixelCount int64
+		for i:=0 ;i<numSimUpdater;i++ {
+			sumPixelCount+=pixelCntSli[i]
+			pixelCntSli[i]=0
+		}
+		//pixelCount := atomic.LoadInt64(&sumPixelCount)
+		log.Printf("%v", humanize.Comma(sumPixelCount))
 
-		atomic.StoreInt64(&pixelCnt, 0)
-		atomic.AddInt64(&totalPixelCnt, pixelCount)
+		//atomic.StoreInt64(&pixelCnt, 0)
+		atomic.AddInt64(&totalPixelCnt, sumPixelCount)
 	}
 	runtime.UnlockOSThread()
 }
@@ -90,7 +98,7 @@ func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 		gfx.PixelRGBA(ren,int32(x),int32(y),255,255,0,255) */
 	(*pixels)[y*W+x] = color //uint32((color & 0xff0000) >> 16) | uint32((color & 0xff00) >> 8) | uint32(color & 0xff)
 
-	atomic.AddInt64(&pixelCnt, 1)
+
 
 }
 
@@ -218,13 +226,12 @@ func windowInit() {
 	//	sdl.SetHint("SDL_HINT_RENDER_DRIVER", "metal") //this fails on older OSX versions, I don't care
 
 	case "Linux":
-
+		//OpenGLES2
+		sdl.GLSetAttribute(sdl.GL_CONTEXT_PROFILE_MASK,sdl.GL_CONTEXT_PROFILE_ES)
+		sdl.GLSetAttribute(sdl.GL_CONTEXT_MAJOR_VERSION,2)
+		sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION,0)
 	}
 
-	/* //OpenGLES2
-	sdl.GLSetAttribute(sdl.GL_CONTEXT_PROFILE_MASK,sdl.GL_CONTEXT_PROFILE_ES)
-	sdl.GLSetAttribute(sdl.GL_CONTEXT_MAJOR_VERSION,2)
-	sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION,0) */
 
 
 	numdrv, _ := sdl.GetNumRenderDrivers()
@@ -302,7 +309,7 @@ func sdlEventLoop() {
 		//log.Print(event)
 		switch event.(type) {
 		case *sdl.QuitEvent:
-			println("SDL Quit")
+			log.Print("SDL Quit")
 			stopRunning()
 			return
 		}
@@ -310,7 +317,7 @@ func sdlEventLoop() {
 }
 
 func updateSim(gridx int) {
-	runtime.LockOSThread()
+
 	for pixels == nil { //wait for bitmap to become available
 		runtime.Gosched()
 	}
@@ -318,12 +325,12 @@ func updateSim(gridx int) {
 	for isRunning() {
 		for _, element := range lines {
 			pfparse(element)
-			atomic.AddInt64(&pixelCnt, 1)
+			pixelCntSli[gridx]+=1
 		}
 		time.Sleep(time.Duration(rand.Int63n(10)) * time.Millisecond) // some random delay
 	}
 	log.Printf("Exit updateSim %v", gridx)
-	runtime.UnlockOSThread()
+
 }
 
 //take 10 memory profiles every 5 seconds
