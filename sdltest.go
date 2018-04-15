@@ -37,6 +37,10 @@ var pixelCnt int64
 var totalPixelCnt int64
 
 var pixels *[]uint32
+var pixelsArr []byte
+var sdlTexture *sdl.Texture
+var renderer *sdl.Renderer
+
 var xrunning bool = true
 var window *sdl.Window
 
@@ -194,9 +198,18 @@ func printSurfaceInfo(sur *sdl.Surface, name string) {
 
 func windowInit() {
 	var err error
+	platform := sdl.GetPlatform()
+	log.Printf("platform: %v",platform)
+	switch platform {
+	case "Mac OS X":
+	//	sdl.SetHint("SDL_HINT_FRAMEBUFFER_ACCELERATION", "1")
+	//	sdl.SetHint("SDL_HINT_RENDER_DRIVER", "metal") //this fails on older OSX versions, I don't care
+	}
 
-	sdl.SetHint("SDL_HINT_FRAMEBUFFER_ACCELERATION", "1")
-
+	/* //OpenGLES2
+	sdl.GLSetAttribute(sdl.GL_CONTEXT_PROFILE_MASK,sdl.GL_CONTEXT_PROFILE_ES)
+	sdl.GLSetAttribute(sdl.GL_CONTEXT_MAJOR_VERSION,2)
+	sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION,0) */
 
 
 	numdrv, _ := sdl.GetNumRenderDrivers()
@@ -204,11 +217,7 @@ func windowInit() {
 		var rinfo sdl.RendererInfo
 		sdl.GetRenderDriverInfo(i, &rinfo)
 		name := rinfo.Name
-		log.Printf("available rendere: %v", name)
-		if name == "metal" {
-			log.Print("🤘!")
-			sdl.SetHint("SDL_HINT_RENDER_DRIVER", "metal")
-		}
+		log.Printf("available renderer driver: %v", name)
 	}
 
 	if err = sdl.Init(sdl.INIT_EVERYTHING); err != nil {
@@ -224,22 +233,35 @@ func windowInit() {
 		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS /*|sdl.WINDOW_OPENGL*/)
 	checkError(err)
 
-	surface, err := window.GetSurface()
-	checkError(err)
+	//surface, err := window.GetSurface()
+	//checkError(err)
 
-	printSurfaceInfo(surface, "window")
+	//printSurfaceInfo(surface, "window")
 
-	W = uint32(surface.W)
-	H = uint32(surface.H)
+	//W = uint32(surface.W)
+	//H = uint32(surface.H)
+
+	renderer,err = sdl.CreateRenderer(window,-1,sdl.RENDERER_ACCELERATED)
+	checkErr(err)
+
+
+	sdlTexture,err = renderer.CreateTexture(
+		sdl.PIXELFORMAT_ARGB8888,
+		sdl.TEXTUREACCESS_STREAMING,
+		int32(W), int32(H));
+
 
 	//extract []unit32 pixel buffer from window
-	pixelsPtr := uintptr(surface.Data())
+/*	pixelsPtr := uintptr(surface.Data())
 	pixelsSlice := struct {
 		addr uintptr
 		len  int
 		cap  int
 	}{pixelsPtr, int(W * H * 4), int(W * H * 4)}
-	pixels = (*[]uint32)(unsafe.Pointer(&pixelsSlice))
+	pixels = (*[]uint32)(unsafe.Pointer(&pixelsSlice)) */
+
+	pixelsArr = make ([]byte,W*H*4) //the actual pixel buffer hidden in a golang array
+	pixels=(*[]uint32)(unsafe.Pointer(&pixelsArr))
 
 }
 
@@ -260,7 +282,12 @@ func stopRunning() {
 
 func updateWin() {
 	atomic.AddUint64(&frames, 1)
-	window.UpdateSurface()
+	//window.UpdateSurface()
+
+	sdlTexture.Update(nil,pixelsArr,int(W*4))
+	renderer.Clear()
+	renderer.Copy(sdlTexture,nil,nil)
+	renderer.Present()
 }
 
 func sdlEventLoop() {
