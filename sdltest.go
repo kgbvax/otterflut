@@ -31,7 +31,7 @@ var H uint32 = 968
 
 var lines []string
 
-const numSimUpdater int = 4
+const numSimUpdater int = 2
 
 var pixelCnt int64
 var totalPixelCnt int64
@@ -196,6 +196,18 @@ func printSurfaceInfo(sur *sdl.Surface, name string) {
 	log.Printf("%v pitch: %v\n", name, sur.Pitch)
 }
 
+func updateWin() {
+	atomic.AddUint64(&frames, 1)
+	//window.UpdateSurface()
+
+	sdlTexture.Update(nil,pixelsArr,int(W*4))
+	renderer.Clear()
+	renderer.Copy(sdlTexture,nil,nil)
+	renderer.Present()
+	window.UpdateSurface()
+
+}
+
 func windowInit() {
 	var err error
 	platform := sdl.GetPlatform()
@@ -204,6 +216,9 @@ func windowInit() {
 	case "Mac OS X":
 	//	sdl.SetHint("SDL_HINT_FRAMEBUFFER_ACCELERATION", "1")
 	//	sdl.SetHint("SDL_HINT_RENDER_DRIVER", "metal") //this fails on older OSX versions, I don't care
+
+	case "Linux":
+
 	}
 
 	/* //OpenGLES2
@@ -280,15 +295,7 @@ func stopRunning() {
 	}
 }
 
-func updateWin() {
-	atomic.AddUint64(&frames, 1)
-	//window.UpdateSurface()
 
-	sdlTexture.Update(nil,pixelsArr,int(W*4))
-	renderer.Clear()
-	renderer.Copy(sdlTexture,nil,nil)
-	renderer.Present()
-}
 
 func sdlEventLoop() {
 	for event := sdl.WaitEventTimeout(100); isRunning() && event != nil; event = sdl.WaitEvent() {
