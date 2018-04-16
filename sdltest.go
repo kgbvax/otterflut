@@ -259,33 +259,21 @@ func windowInit() {
 
 	W=uint32(displayBounds.W)
 	H=uint32(displayBounds.H)
-	var renderer *sdl.Renderer
 
-	window,renderer,err =sdl.CreateWindowAndRenderer(displayBounds.W, displayBounds.H,sdl.WINDOW_SHOWN|sdl.WINDOW_FULLSCREEN)
-	checkError(err)
+
+	window, err = sdl.CreateWindow("otterflut", 0, 0,int32(W),int32(H),
+		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS )
+
+
+	log.Print("create renderer")
+	renderer,err = sdl.CreateRenderer(window,-1,sdl.RENDERER_SOFTWARE)
+	checkErr(err)
 	checkSdlError()
+
 	info,err:=renderer.GetInfo()
 	log.Printf("selected renderer: %v",info.Name)
 	log.Printf("max texgure size: %vx%v",info.MaxTextureWidth,info.MaxTextureHeight)
 
-
-	/*
-	window, err = sdl.CreateWindow("otterflut", 0, 0,
-
-		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS )
-
-	//surface, err := window.GetSurface()
-	//checkError(err)
-
-	//printSurfaceInfo(surface, "window")
-
-	//W = uint32(surface.W)
-	//H = uint32(surface.H)
-	log.Print("create renderer")
-	renderer,err = sdl.CreateRenderer(window,-1,sdl.RENDERER_ACCELERATED)
-	checkErr(err)
-	checkSdlError()
-	*/
 
 	log.Print("create texture")
 	sdlTexture,err = renderer.CreateTexture(
@@ -294,14 +282,6 @@ func windowInit() {
 		int32(W), int32(H))
     checkErr(err)
 	checkSdlError()
-	//extract []unit32 pixel buffer from window
-/*	pixelsPtr := uintptr(surface.Data())
-	pixelsSlice := struct {
-		addr uintptr
-		len  int
-		cap  int
-	}{pixelsPtr, int(W * H * 4), int(W * H * 4)}
-	pixels = (*[]uint32)(unsafe.Pointer(&pixelsSlice)) */
 
 	pixelsArr = make ([]byte,W*H*4) //the actual pixel buffer hidden in a golang array
 	pixels=(*[]uint32)(unsafe.Pointer(&pixelsArr))
