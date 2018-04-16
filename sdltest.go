@@ -247,9 +247,14 @@ func windowInit() {
 	if err = sdl.Init(sdl.INIT_EVERYTHING); err != nil {
 		panic(err)
 	}
+	checkSdlError()
+
 	sdl.DisableScreenSaver()
 
-	displayBounds, _ := sdl.GetDisplayBounds(0)
+	checkSdlError()
+
+	displayBounds, err := sdl.GetDisplayBounds(0)
+	checkErr(err)
 	log.Printf("display: %vx%v", displayBounds.W, displayBounds.H)
 
 	W=uint32(displayBounds.W)
@@ -258,6 +263,7 @@ func windowInit() {
 		displayBounds.W, displayBounds.H,
 		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS /*|sdl.WINDOW_OPENGL*/)
 	checkError(err)
+	checkSdlError()
 
 	//surface, err := window.GetSurface()
 	//checkError(err)
@@ -269,14 +275,14 @@ func windowInit() {
 
 	renderer,err = sdl.CreateRenderer(window,-1,0)
 	checkErr(err)
-
+	checkSdlError()
 
 	sdlTexture,err = renderer.CreateTexture(
 		sdl.PIXELFORMAT_ARGB8888,
 		sdl.TEXTUREACCESS_STREAMING,
 		int32(W), int32(H))
     checkErr(err)
-
+	checkSdlError()
 	//extract []unit32 pixel buffer from window
 /*	pixelsPtr := uintptr(surface.Data())
 	pixelsSlice := struct {
@@ -360,8 +366,13 @@ func memProfileWriter() {
 	}
 }
 
-func startWindowsUpdateTicker() {
+func checkSdlError() {
+	error:=sdl.GetError()
 
+	if error!=nil {
+		log.Printf("sdl: ",error)
+		sdl.ClearError()
+	}
 }
 
 func main() {
@@ -417,12 +428,7 @@ func main() {
 	for i := 0; i < numSimUpdater; i++ {
 		go updateSim(i)
 	}
-	error:=sdl.GetError()
 
-	if error!=nil {
-		log.Printf("main: ",error)
-		sdl.ClearError()
-	}
 	sdlEventLoop()
 
 	(*window).Destroy()
