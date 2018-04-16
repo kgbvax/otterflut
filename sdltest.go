@@ -44,9 +44,11 @@ var pixels *[]uint32
 var pixelsArr []byte
 var sdlTexture *sdl.Texture
 var renderer *sdl.Renderer
+var allDisplay *sdl.Rect
 
 var xrunning bool = true
 var window *sdl.Window=nil
+
 
 var frames uint64
 var errorCnt int64
@@ -210,12 +212,15 @@ func updateWin() {
 	//window.UpdateSurface()
 	sdlTexture.Unlock()
 
-	sdlTexture.Update(nil,pixelsArr,int(W*4))
+
+	sdlTexture.Update(allDisplay,pixelsArr,int(W*4))
+
 	renderer.Clear()
-	renderer.Copy(sdlTexture,nil,nil)
+	renderer.Copy(sdlTexture,allDisplay,allDisplay)
 	renderer.Present()
-	window.UpdateSurface()
-	sdlTexture.Lock(nil)
+
+	//window.UpdateSurface()
+	sdlTexture.Lock(allDisplay)
 
 }
 
@@ -261,6 +266,7 @@ func windowInit() {
 
 	W=uint32(displayBounds.W)
 	H=uint32(displayBounds.H)
+	allDisplay = &sdl.Rect{0, 0, int32(W), int32(H)}
 
 
 	window, err = sdl.CreateWindow("otterflut", 0, 0,int32(W),int32(H),
@@ -280,7 +286,7 @@ func windowInit() {
 	log.Print("create texture")
 	sdlTexture,err = renderer.CreateTexture(
 		sdl.PIXELFORMAT_ARGB8888,
-		sdl.TEXTUREACCESS_TARGET,
+		sdl.TEXTUREACCESS_STREAMING,
 		int32(W), int32(H))
     checkErr(err)
 	checkSdlError()
