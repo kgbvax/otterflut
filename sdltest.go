@@ -228,9 +228,9 @@ func windowInit() {
 
 	case "Linux":
 		//OpenGLES2
-		sdl.GLSetAttribute(sdl.GL_CONTEXT_PROFILE_MASK,sdl.GL_CONTEXT_PROFILE_ES)
-		sdl.GLSetAttribute(sdl.GL_CONTEXT_MAJOR_VERSION,2)
-		sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION,0)
+		//sdl.GLSetAttribute(sdl.GL_CONTEXT_PROFILE_MASK,sdl.GL_CONTEXT_PROFILE_ES)
+		//sdl.GLSetAttribute(sdl.GL_CONTEXT_MAJOR_VERSION,2)
+		//sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION,0)
 	}
 
 
@@ -249,7 +249,7 @@ func windowInit() {
 	sdl.DisableScreenSaver()
 
 	displayBounds, _ := sdl.GetDisplayBounds(0)
-	log.Printf("display: %v * %v", displayBounds.W, displayBounds.H)
+	log.Printf("display: %vx%v", displayBounds.W, displayBounds.H)
 
 	W=uint32(displayBounds.W)
 	H=uint32(displayBounds.H)
@@ -330,7 +330,6 @@ func sdlEventLoop() {
 }
 
 func updateSim(gridx int) {
-
 	for pixels == nil { //wait for bitmap to become available
 		runtime.Gosched()
 	}
@@ -366,6 +365,7 @@ func startWindowsUpdateTicker() {
 
 func main() {
 	runtime.GOMAXPROCS(16 + runtime.NumCPU())
+	sdl.ClearError()
 
 	bdata, err := ioutil.ReadFile("test.pxfl")
 	checkError(err)
