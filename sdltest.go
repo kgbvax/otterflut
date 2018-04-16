@@ -26,8 +26,9 @@ type opix struct {
 	A byte
 }
 
-var W uint32 = 1824
-var H uint32 = 968
+//uint to save on sign manipulation in hot loop
+var W uint32 = 800
+var H uint32 = 600
 
 var lines []string
 
@@ -250,6 +251,8 @@ func windowInit() {
 	displayBounds, _ := sdl.GetDisplayBounds(0)
 	log.Printf("display: %v * %v", displayBounds.W, displayBounds.H)
 
+	W=uint32(displayBounds.W)
+	H=uint32(displayBounds.H)
 	window, err = sdl.CreateWindow("otterflut", 0, 0,
 		displayBounds.W, displayBounds.H,
 		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS /*|sdl.WINDOW_OPENGL*/)
@@ -263,15 +266,15 @@ func windowInit() {
 	//W = uint32(surface.W)
 	//H = uint32(surface.H)
 
-	renderer,err = sdl.CreateRenderer(window,-1,sdl.RENDERER_ACCELERATED)
+	renderer,err = sdl.CreateRenderer(window,-1,0)
 	checkErr(err)
 
 
 	sdlTexture,err = renderer.CreateTexture(
 		sdl.PIXELFORMAT_ARGB8888,
 		sdl.TEXTUREACCESS_STREAMING,
-		int32(W), int32(H));
-
+		int32(W), int32(H))
+    checkErr(err)
 
 	//extract []unit32 pixel buffer from window
 /*	pixelsPtr := uintptr(surface.Data())
@@ -358,17 +361,7 @@ func memProfileWriter() {
 }
 
 func startWindowsUpdateTicker() {
-	ticker := time.NewTicker(1000 / 30 * time.Millisecond) //target 30fps
-	go func() {
-		for range ticker.C {
-			if isRunning() {
-				updateWin()
-			} else {
-				log.Print("Exit Window update ticker")
-				return //the end
-			}
-		}
-	}()
+
 }
 
 func main() {
@@ -402,7 +395,18 @@ func main() {
 	go printPixel()
 	go printFps()
 
-	go startWindowsUpdateTicker()
+	ticker := time.NewTicker(1000 / 30 * time.Millisecond) //target 30fps
+	go func() {
+		for range ticker.C {
+			if isRunning() {
+				updateWin()
+			} else {
+				log.Print("Exit Window update ticker")
+				return //the end
+			}
+		}
+	}()
+
 	go Server(serverQuit)
 
 	//simulated messages
