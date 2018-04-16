@@ -272,11 +272,12 @@ func windowInit() {
 
 	//W = uint32(surface.W)
 	//H = uint32(surface.H)
-
+	log.Print("create renderer")
 	renderer,err = sdl.CreateRenderer(window,-1,0)
 	checkErr(err)
 	checkSdlError()
 
+	log.Print("create texture")
 	sdlTexture,err = renderer.CreateTexture(
 		sdl.PIXELFORMAT_ARGB8888,
 		sdl.TEXTUREACCESS_STREAMING,
