@@ -219,6 +219,7 @@ func updateWin() {
 
 func windowInit() {
 	var err error
+
 	platform := sdl.GetPlatform()
 	log.Printf("platform: %v",platform)
 	switch platform {
@@ -365,6 +366,9 @@ func startWindowsUpdateTicker() {
 
 func main() {
 	runtime.GOMAXPROCS(16 + runtime.NumCPU())
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	sdl.ClearError()
 
 	bdata, err := ioutil.ReadFile("test.pxfl")
@@ -412,6 +416,12 @@ func main() {
 	//simulated messages
 	for i := 0; i < numSimUpdater; i++ {
 		go updateSim(i)
+	}
+	error:=sdl.GetError()
+
+	if error!=nil {
+		log.Printf("main: ",error)
+		sdl.ClearError()
 	}
 	sdlEventLoop()
 
