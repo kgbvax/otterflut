@@ -275,7 +275,7 @@ func windowInit() {
 
 
 	window, err = sdl.CreateWindow("otterflut", 0, 0,int32(W),int32(H),
-		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS )
+		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_FULLSCREEN )
 
 
 	log.Print("create renderer")
