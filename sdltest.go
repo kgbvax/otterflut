@@ -242,6 +242,11 @@ func windowInit() {
 	}
 
 
+	numModes,err:=sdl.GetNumDisplayModes(0)
+	for i:=0; i<numModes; i++ {
+		mode,_:=sdl.GetDisplayMode(0,i)
+		log.Printf("mode %vx%v@%v f:",mode.W,mode.H,mode.RefreshRate,mode.Format)
+	}
 
 	numdrv, _ := sdl.GetNumRenderDrivers()
 	for i := 0; i < numdrv; i++ {
