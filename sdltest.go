@@ -305,13 +305,23 @@ func stopRunning() {
 
 
 func sdlEventLoop() {
-	for event := sdl.WaitEventTimeout(100); isRunning() && event != nil; event = sdl.WaitEvent() {
-		//log.Print(event)
-		switch event.(type) {
-		case *sdl.QuitEvent:
-			log.Print("SDL Quit")
-			stopRunning()
-			return
+	for isRunning() {
+		event := sdl.WaitEventTimeout(20)
+		if event!= nil {
+			//log.Print(event)
+			switch event.(type) {
+			case *sdl.QuitEvent:
+				log.Print("SDL Quit")
+				stopRunning()
+				return
+			}
+		} else {
+			error:=sdl.GetError()
+
+			if error!=nil {
+				log.Printf("sdl-event-loop: ",error)
+				sdl.ClearError()
+			}
 		}
 	}
 }
@@ -347,6 +357,20 @@ func memProfileWriter() {
 	}
 }
 
+func startWindowsUpdateTicker() {
+	ticker := time.NewTicker(1000 / 30 * time.Millisecond) //target 30fps
+	go func() {
+		for range ticker.C {
+			if isRunning() {
+				updateWin()
+			} else {
+				log.Print("Exit Window update ticker")
+				return //the end
+			}
+		}
+	}()
+}
+
 func main() {
 	runtime.GOMAXPROCS(16 + runtime.NumCPU())
 
@@ -378,18 +402,7 @@ func main() {
 	go printPixel()
 	go printFps()
 
-	ticker := time.NewTicker(1000 / 30 * time.Millisecond) //target 30fps
-	go func() {
-		for range ticker.C {
-			if isRunning() {
-				updateWin()
-			} else {
-				log.Print("Exit Window update ticker")
-				return //the end
-			}
-		}
-	}()
-
+	go startWindowsUpdateTicker()
 	go Server(serverQuit)
 
 	//simulated messages
