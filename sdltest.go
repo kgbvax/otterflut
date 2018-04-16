@@ -280,7 +280,7 @@ func windowInit() {
 	log.Print("create texture")
 	sdlTexture,err = renderer.CreateTexture(
 		sdl.PIXELFORMAT_ARGB8888,
-		sdl.TEXTUREACCESS_STREAMING,
+		sdl.TEXTUREACCESS_TARGET,
 		int32(W), int32(H))
     checkErr(err)
 	checkSdlError()
