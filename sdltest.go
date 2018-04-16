@@ -46,7 +46,7 @@ var sdlTexture *sdl.Texture
 var renderer *sdl.Renderer
 
 var xrunning bool = true
-var window *sdl.Window
+var window *sdl.Window=nil
 
 var frames uint64
 var errorCnt int64
@@ -224,8 +224,8 @@ func windowInit() {
 	log.Printf("platform: %v",platform)
 	switch platform {
 	case "Mac OS X":
-	//	sdl.SetHint("SDL_HINT_FRAMEBUFFER_ACCELERATION", "1")
-	//	sdl.SetHint("SDL_HINT_RENDER_DRIVER", "metal") //this fails on older OSX versions, I don't care
+	    sdl.SetHint("SDL_HINT_FRAMEBUFFER_ACCELERATION", "1")
+	    sdl.SetHint("SDL_HINT_RENDER_DRIVER", "metal") //this fails on older OSX versions, I don't care
 
 	case "Linux":
 		//OpenGLES2
@@ -244,14 +244,14 @@ func windowInit() {
 		log.Printf("available renderer driver: %v", name)
 	}
 
-	if err = sdl.Init(sdl.INIT_EVERYTHING); err != nil {
+	if err = sdl.Init(sdl.INIT_VIDEO); err != nil {
 		panic(err)
 	}
 	checkSdlError()
 
-	sdl.DisableScreenSaver()
+	//sdl.DisableScreenSaver()
 
-	checkSdlError()
+	//checkSdlError()
 
 	displayBounds, err := sdl.GetDisplayBounds(0)
 	checkErr(err)
@@ -259,11 +259,20 @@ func windowInit() {
 
 	W=uint32(displayBounds.W)
 	H=uint32(displayBounds.H)
-	window, err = sdl.CreateWindow("otterflut", 0, 0,
-		displayBounds.W, displayBounds.H,
-		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS /*|sdl.WINDOW_OPENGL*/)
+	var renderer *sdl.Renderer
+
+	window,renderer,err =sdl.CreateWindowAndRenderer(displayBounds.W, displayBounds.H,sdl.WINDOW_SHOWN|sdl.WINDOW_FULLSCREEN)
 	checkError(err)
 	checkSdlError()
+	info,err:=renderer.GetInfo()
+	log.Printf("selected renderer: %v",info.Name)
+	log.Printf("max texgure size: %vx%v",info.MaxTextureWidth,info.MaxTextureHeight)
+
+
+	/*
+	window, err = sdl.CreateWindow("otterflut", 0, 0,
+
+		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_BORDERLESS )
 
 	//surface, err := window.GetSurface()
 	//checkError(err)
@@ -273,9 +282,10 @@ func windowInit() {
 	//W = uint32(surface.W)
 	//H = uint32(surface.H)
 	log.Print("create renderer")
-	renderer,err = sdl.CreateRenderer(window,-1,0)
+	renderer,err = sdl.CreateRenderer(window,-1,sdl.RENDERER_ACCELERATED)
 	checkErr(err)
 	checkSdlError()
+	*/
 
 	log.Print("create texture")
 	sdlTexture,err = renderer.CreateTexture(
