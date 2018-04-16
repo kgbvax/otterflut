@@ -208,12 +208,14 @@ func printSurfaceInfo(sur *sdl.Surface, name string) {
 func updateWin() {
 	atomic.AddUint64(&frames, 1)
 	//window.UpdateSurface()
+	sdlTexture.Unlock()
 
 	sdlTexture.Update(nil,pixelsArr,int(W*4))
 	renderer.Clear()
 	renderer.Copy(sdlTexture,nil,nil)
 	renderer.Present()
 	window.UpdateSurface()
+	sdlTexture.Lock(nil)
 
 }
 
@@ -224,7 +226,7 @@ func windowInit() {
 	log.Printf("platform: %v",platform)
 	switch platform {
 	case "Mac OS X":
-	    sdl.SetHint("SDL_HINT_FRAMEBUFFER_ACCELERATION", "1")
+	    sdl.SetHint("SDL_HINT_FRAMEBUFFER_ACCELERATION", "metal")
 	    sdl.SetHint("SDL_HINT_RENDER_DRIVER", "metal") //this fails on older OSX versions, I don't care
 
 	case "Linux":
@@ -266,7 +268,7 @@ func windowInit() {
 
 
 	log.Print("create renderer")
-	renderer,err = sdl.CreateRenderer(window,-1,sdl.RENDERER_SOFTWARE)
+	renderer,err = sdl.CreateRenderer(window,-1,sdl.RENDERER_PRESENTVSYNC|sdl.RENDERER_ACCELERATED)
 	checkErr(err)
 	checkSdlError()
 
@@ -282,6 +284,7 @@ func windowInit() {
 		int32(W), int32(H))
     checkErr(err)
 	checkSdlError()
+	sdlTexture.Lock(nil)
 
 	pixelsArr = make ([]byte,W*H*4) //the actual pixel buffer hidden in a golang array
 	pixels=(*[]uint32)(unsafe.Pointer(&pixelsArr))
