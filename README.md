@@ -4,10 +4,10 @@ maybe a fast one and
 maybe one with "pluggable rules".
 
 # Goals
-* In golang (just because I want to practice)
-* Fast, consume a full gigabit on an ARM CPU
+* In golang (just because)
+* Fast, consume a full gigabit on an ARM (Odroid XU4)
 * With pluggable "rules" to make it more interesting...
-* Insane, consume 10Gbit/sec on an ARM CPU
+* Maybe: Insanely fast, consume 10Gbit/sec on an ARM board like MACCHIATObin
 
 # Status
 * Works on Mac,Linux, requires SDL2
