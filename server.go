@@ -15,6 +15,11 @@ import (
 var port string = "1234"
 var connLimit int = 1024
 
+const SINGLE_PIXEL_LL = 18 //PX nnn nnn rrggbb_
+const READ_PIXEL_B = 10
+const   readChunkSize = SINGLE_PIXEL_LL * READ_PIXEL_B
+
+
 // Or as a kind user on reddit refactored:
 func checkErr(err error) {
 	if err != nil {
@@ -43,6 +48,9 @@ func acceptConns(srv net.Listener) <-chan net.Conn {
 	return conns
 }
 
+func xScan() {
+
+}
 // Handles incoming requests.
 // Handles closing of the connection.
 func handleConnection(conn net.Conn) {
@@ -55,9 +63,11 @@ func handleConnection(conn net.Conn) {
 		conn.Close()
 	}()
 
+	buffered:=bufio.NewReaderSize(conn,8192)
 
-	scanner := bufio.NewScanner(conn)
+	scanner := bufio.NewScanner(buffered)
 	var s string
+
 	for scanner.Scan() { //TODO this most likely needs tuning
 		s = scanner.Text()
 
