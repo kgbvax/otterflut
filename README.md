@@ -10,6 +10,7 @@ maybe one with "pluggable rules".
 * Insane, consume 10Gbit/sec on an ARM CPU
 
 # Status
+* Works on Mac,Linux, requires SDL2
 * parsing "PX messages" and settings pixels currently works with well over 1Gbit/sec on an Odroid XU4
 * reading from network is slow as molasses
 
