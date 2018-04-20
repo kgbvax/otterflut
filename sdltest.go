@@ -16,6 +16,7 @@ import (
 	"math/rand"
 	_ "net/http/pprof"
 	"strconv"
+	"sync"
 )
 
 type opix struct {
@@ -54,6 +55,9 @@ var frames uint64
 var errorCnt int64
 
 var serverQuit chan int = make(chan int)
+
+var globalWinUpdateLock sync.Locker
+
 
 func printFps() {
 
@@ -210,9 +214,12 @@ func printSurfaceInfo(sur *sdl.Surface, name string) {
 }
 
 func updateWin() {
-	atomic.AddUint64(&frames, 1)
+	globalWinUpdateLock.Lock()
+
+	frames++
+
 	//window.UpdateSurface()
-	//sdlTexture.Unlock()
+	sdlTexture.Unlock()
 
 
 	sdlTexture.Update(allDisplay,pixelsArr,int(W*4))
@@ -222,7 +229,10 @@ func updateWin() {
 	renderer.Present()
 
 	//window.UpdateSurface()
-	//sdlTexture.Lock(allDisplay)
+	sdlTexture.Lock(allDisplay)
+
+	globalWinUpdateLock.Unlock()
+
 
 }
 
