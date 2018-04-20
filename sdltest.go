@@ -56,7 +56,7 @@ var errorCnt int64
 
 var serverQuit chan int = make(chan int)
 
-var globalWinUpdateLock sync.Locker
+var globalWinUpdateLock = sync.Mutex{}
 
 
 func printFps() {
