@@ -34,7 +34,6 @@ func acceptConns(srv net.Listener) <-chan net.Conn {
 
 	go func() {
 		for isRunning() {
-
 			conn, err := srv.Accept()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error accepting connection: %v\n", err)
@@ -51,6 +50,22 @@ func acceptConns(srv net.Listener) <-chan net.Conn {
 func xScan() {
 
 }
+
+
+
+//reading gameplan
+//read into buffer up to X
+//traverse buffer looking for \n
+//found: print slice
+//  continue scanning
+//end reached and not \n:  copy "remains" to beginning of buffer (<- sucks) and read again
+// continue scanning: if no \n found: pathological, discard
+//
+//options:
+// * can we read into a ring-buffer, would save copies?
+// * are "bytes" faster than strings?
+
+
 // Handles incoming requests.
 // Handles closing of the connection.
 func handleConnection(conn net.Conn) {
@@ -63,42 +78,50 @@ func handleConnection(conn net.Conn) {
 		conn.Close()
 	}()
 
-	buffered:=bufio.NewReaderSize(conn,8192)
 
-	scanner := bufio.NewScanner(buffered)
-	var s string
+	//buffered:=bufio.NewReaderSize(conn,8192)
 
-	for scanner.Scan() { //TODO this most likely needs tuning
-		s = scanner.Text()
+	scanner:=bufio.NewScanner(conn)
 
-		if len(s) > 1 && //we can save the len test if this becomes a gurantee of the "scanning"
-			s[0] == 'P' { // we only test for the first "P" on purpose.
-			pfparse(s)
-			//log.Printf("parsed %v",s)
+
+	for { //TODO this most likely needs tuning
+		if scanner.Scan() {
+		s:=scanner.Text()
+		//err=nil
+
+		//s, err := buffered.ReadString('\n')
+		/* if err != nil {
+			// log.Print("error reading: %v", err)
+
+		} else { */
+
+			if len(s) > 1 && //we can save the len test if this becomes a gurantee of the "scanning"
+				s[0] == 'P' { //  only test for the first "P" on purpose and speculate the this max be a PX message
+				pfparse(s)
+			} else { //anything other than PX, performance not that big of an issue
+				s2 := strings.ToLower(s)
+				if strings.Contains(s2, "size") {
+					conn.Write([]byte(fmt.Sprintf("SIZE %v %v\n", W, H)))
+				}
+				if strings.Contains(s, "help") {
+					hostname, _ := os.Hostname()
+					HELP := "OTTERFLUT (github.com/kgbvax/otterflut) on " + hostname + " (" + runtime.GOARCH + "/" + runtime.Version() +
+						")\nCommands:\n" +
+						"'PX x y rrggbb' set a pixel, where x,y = decimal postitive integer and colors are hex, hex values need leading zeros\n" +
+						"'HELP' - this text\n" +
+						"'SIZE' - get canvas size ,responds with 'SIZE X Y'\n" +
+						"\nReading pixels is not supported, alpha is not implemented yet\n"
+					conn.Write([]byte(HELP))
+
+				}
+			}
 		} else {
-			s2 := strings.ToLower(s)
-			if strings.Contains(s2, "size") {
-				conn.Write([]byte(fmt.Sprintf("SIZE %v %v\n", W, H)))
-			}
-			if strings.Contains(s, "help") {
-				hostname, _ := os.Hostname()
-				HELP := "OTTERFLUT (github.com/kgbvax/otterflut) on " + hostname + " (" + runtime.GOARCH + "/" + runtime.Version() +
-					")\nCommands:\n" +
-					"'PX x y rrggbb' set a pixel, where x,y = decimal postitive integer and colors are hex, hex values need leading zeros\n" +
-					"'HELP' - this text\n" +
-					"'SIZE' - get canvas size ,responds with 'SIZE X Y'\n"+
-					"\nReading pixels is not supported, alpha is not implemented yet\n"
-				conn.Write([]byte(HELP))
-
-			}
+			log.Printf("scan failed ")
 		}
 	}
 
-	// If a failure to read input occurs,
-	// it's probably my bad.
-	if err := scanner.Err(); err != nil {
-		log.Fatalf("Error reading: %v", err) // TODO don't just kick the bucket
-	}
+
+
 }
 
 func Server(quit chan int) { //todo add mechanism to terminate, channel?

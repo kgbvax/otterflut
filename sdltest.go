@@ -33,7 +33,7 @@ var H uint32 = 600
 var lines []string
 
 
-const numSimUpdater int = 4
+const numSimUpdater int = 0
 
 var pixelCntSli [numSimUpdater]int64
 
@@ -71,13 +71,15 @@ func printPixel() {
 	for isRunning() {
 		time.Sleep(time.Second * 1)
 		var sumPixelCount int64
-		for i:=0 ;i<numSimUpdater;i++ {
+		/*for i:=0 ;i<numSimUpdater;i++ {
 			sumPixelCount+=pixelCntSli[i]
 			pixelCntSli[i]=0
 		}
-		//pixelCount := atomic.LoadInt64(&sumPixelCount)
-		log.Printf("%v", humanize.Comma(sumPixelCount))
+		//pixelCount := atomic.LoadInt64(&sumPixelCount) */
+		sumPixelCount=pixelXXCnt
 
+		log.Printf("%v", humanize.Comma(sumPixelCount))
+		pixelXXCnt=0
 		//atomic.StoreInt64(&pixelCnt, 0)
 		atomic.AddInt64(&totalPixelCnt, sumPixelCount)
 	}
@@ -101,7 +103,7 @@ func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 		gfx.PixelRGBA(ren,int32(x),int32(y),255,255,0,255) */
 	(*pixels)[y*W+x] = color //uint32((color & 0xff0000) >> 16) | uint32((color & 0xff00) >> 8) | uint32(color & 0xff)
 
-
+	pixelXXCnt+=1
 
 }
 
@@ -210,7 +212,7 @@ func printSurfaceInfo(sur *sdl.Surface, name string) {
 func updateWin() {
 	atomic.AddUint64(&frames, 1)
 	//window.UpdateSurface()
-	sdlTexture.Unlock()
+	//sdlTexture.Unlock()
 
 
 	sdlTexture.Update(allDisplay,pixelsArr,int(W*4))
@@ -220,7 +222,7 @@ func updateWin() {
 	renderer.Present()
 
 	//window.UpdateSurface()
-	sdlTexture.Lock(allDisplay)
+	//sdlTexture.Lock(allDisplay)
 
 }
 
@@ -275,7 +277,7 @@ func windowInit() {
 
 
 	window, err = sdl.CreateWindow("otterflut", 0, 0,int32(W),int32(H),
-		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_FULLSCREEN )
+		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_FULLSCREEN | sdl.WINDOW_OPENGL)
 
 
 	log.Print("create renderer")
@@ -295,7 +297,7 @@ func windowInit() {
 		int32(W), int32(H))
     checkErr(err)
 	checkSdlError()
-	sdlTexture.Lock(nil)
+	//sdlTexture.Lock(nil)
 
 	pixelsArr = make ([]byte,W*H*4) //the actual pixel buffer hidden in a golang array
 	pixels=(*[]uint32)(unsafe.Pointer(&pixelsArr))
