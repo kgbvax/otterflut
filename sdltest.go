@@ -34,7 +34,8 @@ var H uint32 = 600
 var lines []string
 
 
-const numSimUpdater int = 0
+const numSimUpdater = 0
+const TARGET_FPS=1
 
 var pixelCntSli [numSimUpdater]int64
 
@@ -47,14 +48,14 @@ var sdlTexture *sdl.Texture
 var renderer *sdl.Renderer
 var allDisplay *sdl.Rect
 
-var xrunning bool = true
+var xrunning = true
 var window *sdl.Window=nil
 
 
 var frames uint64
 var errorCnt int64
 
-var serverQuit chan int = make(chan int)
+var serverQuit = make(chan int)
 
 var globalWinUpdateLock = sync.Mutex{}
 
@@ -111,83 +112,7 @@ func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 
 }
 
-//find next 'field' quickly ;-)
-func nextNonWs(stri string, initialStart int) (int, int) {
-	i := initialStart
-	length := len(stri)
 
-	// Skip spaces in the front of the input.
-	for ; i < length && stri[i] == ' '; i++ {
-	}
-	start := i
-
-	// now find the end, ie the next space
-	for ; i < length && stri[i] != ' '; i++ {
-	}
-
-	return start, i
-}
-
-//lookup table for hex digits
-var hexval = [256]uint8{'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5,
-	'6': 6, '7': 7, '8': 8, '9': 9, 'a': 10, 'A': 10, 'b': 11, 'B': 11, 'c': 12, 'C': 12, 'd': 13, 'D': 13,
-	'e': 14, 'E': 14, 'f': 15, 'F': 15}
-
-//quickly  parse a 3 byte hex number
-func parseHex3(m string) uint32 {
-	//MUL version, compiles to shifts
-	return 0x100000*uint32(hexval[m[0]]) + 0x010000*uint32(hexval[m[1]]) + 0x001000*uint32(hexval[m[2]]) +
-		0x000100*uint32(hexval[m[3]]) + 0x000010*uint32(hexval[m[4]]) + uint32(hexval[m[5]])
-}
-
-//quickly parse a 4 byte hex number
-func parseHex4(m string) uint32 {
-	//MUL version
-	return 0x10000000*uint32(hexval[m[0]]) + 0x01000000*uint32(hexval[m[1]]) + 0x00100000*uint32(hexval[m[2]]) +
-		0x00010000*uint32(hexval[m[3]]) + 0x00001000*uint32(hexval[m[4]]) + 0x00000100*uint32(hexval[m[5]]) +
-		0x00000010*uint32(hexval[m[6]]) + uint32(hexval[m[7]])
-
-}
-
-// Swiftly parse an Uint32
-// no bounds checks we don't care (at this point)
-func parsUint(m string) uint32 {
-	var n uint32
-	l := len(m)
-	for i := 0; i < l; i++ {
-		n = n*10 + uint32(m[i]-'0')
-	}
-	return n
-}
-
-func pfparse(m string) {
-	//elems := strings.Fields(m)
-
-	//0 -> "PX"
-	//1&2 -> x & y (dec)
-	//3 -> Color(hex)
-
-	var color uint32
-
-	start, end := nextNonWs(m, 3)
-	x := parsUint(m[start:end])
-
-	start, end = nextNonWs(m, end)
-	y := parsUint(m[start:end])
-
-	start, end = nextNonWs(m, end)
-	hexstr := m[start:end]
-
-	if len(hexstr) == 6 {
-		color = parseHex3(hexstr)
-	} else if len(hexstr) == 8 {
-		color = parseHex4(hexstr)
-	} else {
-		atomic.AddInt64(&errorCnt, 1)
-		return
-	}
-	setPixel(x, y, color)
-}
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
 var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
@@ -257,7 +182,7 @@ func windowInit() {
 	numModes,err:=sdl.GetNumDisplayModes(0)
 	for i:=0; i<numModes; i++ {
 		mode,_:=sdl.GetDisplayMode(0,i)
-		log.Printf("mode %vx%v@%v f:",mode.W,mode.H,mode.RefreshRate,mode.Format)
+		log.Printf("mode %vx%v@%v f:%v",mode.W,mode.H,mode.RefreshRate,mode.Format)
 	}
 
 	numdrv, _ := sdl.GetNumRenderDrivers()
@@ -343,10 +268,10 @@ func sdlEventLoop() {
 				return
 			}
 		} else {
-			error:=sdl.GetError()
+			err:=sdl.GetError()
 
-			if error!=nil {
-				log.Printf("sdl-event-loop: ",error)
+			if err!=nil {
+				log.Printf("sdl-event-loop: %v ",err)
 				sdl.ClearError()
 			}
 		}
@@ -384,10 +309,10 @@ func memProfileWriter() {
 }
 
 func checkSdlError() {
-	error:=sdl.GetError()
+	err:=sdl.GetError()
 
-	if error!=nil {
-		log.Printf("sdl: ",error)
+	if err!=nil {
+		log.Printf("sdl: %v",err)
 		sdl.ClearError()
 	}
 }
@@ -427,7 +352,7 @@ func main() {
 	go printPixel()
 	go printFps()
 
-	ticker := time.NewTicker(1000 / 30 * time.Millisecond) //target 30fps
+	ticker := time.NewTicker(1000 / TARGET_FPS * time.Millisecond) //target 30fps
 	go func() {
 		for range ticker.C {
 			if isRunning() {

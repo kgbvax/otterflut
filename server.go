@@ -7,18 +7,21 @@ import (
 	"os/signal"
 	"syscall"
 	"fmt"
-	"bufio"
-	"strings"
+
 	"runtime"
+	"strings"
+	"io"
 )
 
-var port string = "1234"
-var connLimit int = 1024
+var port = "1234"
+var connLimit = 1024
+
+const SOCKET_READ_BUFFER_SZ = 32768
+const SOCKER_READ_CHUNK_SZ = 16384
 
 const SINGLE_PIXEL_LL = 18 //PX nnn nnn rrggbb_
 const READ_PIXEL_B = 10
-const   readChunkSize = SINGLE_PIXEL_LL * READ_PIXEL_B
-
+const readChunkSize = SINGLE_PIXEL_LL * READ_PIXEL_B
 
 // Or as a kind user on reddit refactored:
 func checkErr(err error) {
@@ -27,29 +30,6 @@ func checkErr(err error) {
 	}
 }
 
-// acceptConns uses the semaphore channel on the counter to rate limit.
-// New connections get sent on the returned channel.
-func acceptConns(srv net.Listener) <-chan net.Conn {
-	conns := make(chan net.Conn)
-
-	go func() {
-		for isRunning() {
-			conn, err := srv.Accept()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error accepting connection: %v\n", err)
-				continue
-			}
-
-			conns <- conn
-		}
-	}()
-
-	return conns
-}
-
-func xScan() {
-
-}
 
 
 
@@ -65,6 +45,15 @@ func xScan() {
 // * can we read into a ring-buffer, would save copies?
 // * are "bytes" faster than strings?
 
+/* scan slice for \n, returns index of \n or -1 if not found */
+func findNl(buf []byte) int {
+	for i, v := range buf {
+		if v == '\n' {
+			return i
+		}
+	}
+	return -1
+}
 
 // Handles incoming requests.
 // Handles closing of the connection.
@@ -78,50 +67,85 @@ func handleConnection(conn net.Conn) {
 		conn.Close()
 	}()
 
-
-	//buffered:=bufio.NewReaderSize(conn,8192)
-
-	scanner:=bufio.NewScanner(conn)
-
+	var buffer = make([]byte, SOCKER_READ_CHUNK_SZ)
 
 	for { //TODO this most likely needs tuning
-		if scanner.Scan() {
-		s:=scanner.Text()
-		//err=nil
 
-		//s, err := buffered.ReadString('\n')
-		/* if err != nil {
-			// log.Print("error reading: %v", err)
+		n, err := conn.Read(buffer)
 
-		} else { */
-
-			if len(s) > 1 && //we can save the len test if this becomes a gurantee of the "scanning"
-				s[0] == 'P' { //  only test for the first "P" on purpose and speculate the this max be a PX message
-				pfparse(s)
-			} else { //anything other than PX, performance not that big of an issue
-				s2 := strings.ToLower(s)
-				if strings.Contains(s2, "size") {
-					conn.Write([]byte(fmt.Sprintf("SIZE %v %v\n", W, H)))
-				}
-				if strings.Contains(s, "help") {
-					hostname, _ := os.Hostname()
-					HELP := "OTTERFLUT (github.com/kgbvax/otterflut) on " + hostname + " (" + runtime.GOARCH + "/" + runtime.Version() +
-						")\nCommands:\n" +
-						"'PX x y rrggbb' set a pixel, where x,y = decimal postitive integer and colors are hex, hex values need leading zeros\n" +
-						"'HELP' - this text\n" +
-						"'SIZE' - get canvas size ,responds with 'SIZE X Y'\n" +
-						"\nReading pixels is not supported, alpha is not implemented yet\n"
-					conn.Write([]byte(HELP))
-
-				}
+		//log.Printf("readn %v", n)
+		if err != nil {
+			log.Printf("error reading: %v", err)
+			if err == io.EOF {
+				log.Printf("connection broken")
+				conn.Close()
+				return
 			}
 		} else {
-			log.Printf("scan failed ")
+			offset := 0
+
+			for {
+				nlAt := findNl(buffer[offset:n]) //search in slice from (last) start to
+				if nlAt > 0 { // -1 not found and 0 (zero length) to be ignored
+					//log.Printf("offset: %v, nlAt:%v n:%v",offset,nlAt,n)
+					msg := buffer[offset : offset+nlAt-1]  //without NL
+
+					s_msg := string(msg)
+					//log.Printf("process >>%v<<", s_msg)
+					if len(msg) > 0 {
+						if msg[0] == 'P' {
+
+							pfparse(s_msg)
+						} else {
+							s2 := strings.ToLower(s_msg)
+							if strings.Contains(s2, "size") {
+								_,err= conn.Write([]byte(fmt.Sprintf("SIZE %v %v\n", W, H)))
+								//TODO check err
+							}
+							if strings.Contains(s2, "help") {
+								hostname, _ := os.Hostname()
+								HELP := "OTTERFLUT (github.com/kgbvax/otterflut) on " + hostname + " (" + runtime.GOARCH + "/" + runtime.Version() +
+									")\nCommands:\n" +
+									"'PX x y rrggbb' set a pixel, where x,y = decimal postitive integer and colors are hex, hex values need leading zeros\n" +
+									"'HELP' - this text\n" +
+									"'SIZE' - get canvas size ,responds with 'SIZE X Y'\n" +
+									"\nReading pixels is not supported, alpha is not implemented yet\n"
+								_,err=conn.Write([]byte(HELP))
+								//TODO check err
+							}
+						}
+						offset += nlAt + 1
+					} else {  // zero length msg
+						break
+					}
+				} else { //no NL found
+					break //TODO reshuffle buffer and continue to read MORE
+				}
+			}
 		}
 	}
+}
 
 
+// acceptConns uses the semaphore channel on the counter to rate limit.
+// New connections get sent on the returned channel.
+func acceptConns(srv *net.TCPListener) <-chan *net.TCPConn {
+	conns := make(chan *net.TCPConn)
 
+	go func() {
+		for isRunning() {
+			conn, err := srv.AcceptTCP()
+
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error accepting connection: %v\n", err)
+				continue
+			}
+			conn.SetReadBuffer(SOCKET_READ_BUFFER_SZ)
+			conns <- conn
+		}
+	}()
+
+	return conns
 }
 
 func Server(quit chan int) { //todo add mechanism to terminate, channel?
@@ -133,14 +157,18 @@ func Server(quit chan int) { //todo add mechanism to terminate, channel?
 	addrs, _ := net.LookupHost(hostname)
 	log.Printf("my ips: %v", addrs)
 
-	srv, err := net.Listen("tcp", ":"+port)
+	service := ":"+port
+	tcpAddr, err := net.ResolveTCPAddr("tcp", service)
+	checkError(err)
+
+	srv,err := net.ListenTCP("tcp",tcpAddr)
 	checkErr(err)
-	defer srv.Close()
+
+ 	defer srv.Close()
 
 	// Listen for termination signals.
 	sig := make(chan os.Signal)
 	signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
-
 
 	// Receive new connections on an unbuffered channel.
 	conns := acceptConns(srv)
