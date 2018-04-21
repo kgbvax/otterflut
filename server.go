@@ -90,13 +90,14 @@ func handleConnection(conn net.Conn) {
 					//log.Printf("offset: %v, nlAt:%v n:%v",offset,nlAt,n)
 					msg := buffer[offset : offset+nlAt-1]  //without NL
 
-					s_msg := string(msg)
+
 					//log.Printf("process >>%v<<", s_msg)
 					if len(msg) > 0 {
 						if msg[0] == 'P' {
 
-							pfparse(s_msg)
+							pfparse(msg)
 						} else {
+							s_msg:=string(msg)
 							s2 := strings.ToLower(s_msg)
 							if strings.Contains(s2, "size") {
 								_,err= conn.Write([]byte(fmt.Sprintf("SIZE %v %v\n", W, H)))

@@ -285,7 +285,8 @@ func updateSim(gridx int) {
 
 	for isRunning() {
 		for _, element := range lines {
-			pfparse(element)
+
+			pfparse([]byte(element))
 			pixelCntSli[gridx]+=1
 		}
 		time.Sleep(time.Duration(rand.Int63n(10)) * time.Millisecond) // some random delay

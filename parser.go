@@ -8,14 +8,14 @@ var hexval = [256]uint8{'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5,
 	'e': 14, 'E': 14, 'f': 15, 'F': 15}
 
 //quickly  parse a 3 byte hex number
-func parseHex3(m string) uint32 {
+func parseHex3(m []byte) uint32 {
 	//MUL version, compiles to shifts
 	return 0x100000*uint32(hexval[m[0]]) + 0x010000*uint32(hexval[m[1]]) + 0x001000*uint32(hexval[m[2]]) +
 		0x000100*uint32(hexval[m[3]]) + 0x000010*uint32(hexval[m[4]]) + uint32(hexval[m[5]])
 }
 
 //quickly parse a 4 byte hex number
-func parseHex4(m string) uint32 {
+func parseHex4(m []byte) uint32 {
 	//MUL version
 	return 0x10000000*uint32(hexval[m[0]]) + 0x01000000*uint32(hexval[m[1]]) + 0x00100000*uint32(hexval[m[2]]) +
 		0x00010000*uint32(hexval[m[3]]) + 0x00001000*uint32(hexval[m[4]]) + 0x00000100*uint32(hexval[m[5]]) +
@@ -24,7 +24,7 @@ func parseHex4(m string) uint32 {
 }
 
 //find next 'field' quickly ;-)
-func nextNonWs(stri string, initialStart int) (int, int) {
+func nextNonWs(stri []byte, initialStart int) (int, int) {
 	i := initialStart
 	length := len(stri)
 
@@ -43,7 +43,7 @@ func nextNonWs(stri string, initialStart int) (int, int) {
 
 // Swiftly parse an Uint32
 // no bounds checks we don't care (at this point)
-func parsUint(m string) uint32 {
+func parsUint(m []byte) uint32 {
 	var n uint32
 	l := len(m)
 	for i := 0; i < l; i++ {
@@ -52,7 +52,7 @@ func parsUint(m string) uint32 {
 	return n
 }
 
-func pfparse(m string) {
+func pfparse(m []byte) {
 	//elems := strings.Fields(m)
 
 	//0 -> "PX"
