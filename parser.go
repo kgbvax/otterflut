@@ -23,7 +23,7 @@ func parseHex4(m []byte) uint32 {
 
 }
 
-//find next 'field' quickly ;-)
+//find next 'field' 'quickly' ;-)
 func nextNonWs(stri []byte, initialStart int) (int, int) {
 	i := initialStart
 	length := len(stri)
@@ -45,19 +45,18 @@ func nextNonWs(stri []byte, initialStart int) (int, int) {
 // no bounds checks we don't care (at this point)
 func parsUint(m []byte) uint32 {
 	var n uint32
-	l := len(m)
+
+	/*	l := len(m)
 	for i := 0; i < l; i++ {
 		n = n*10 + uint32(m[i]-'0')
+	} */
+	for _, v := range m {
+		n = n*10 + uint32(v-'0')
 	}
 	return n
 }
 
 func pfparse(m []byte) {
-	//elems := strings.Fields(m)
-
-	//0 -> "PX"
-	//1&2 -> x & y (dec)
-	//3 -> Color(hex)
 
 	var color uint32
 

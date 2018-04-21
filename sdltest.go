@@ -17,6 +17,7 @@ import (
 	_ "net/http/pprof"
 	"strconv"
 	"sync"
+	"runtime/trace"
 )
 
 type opix struct {
@@ -35,7 +36,8 @@ var lines []string
 
 
 const numSimUpdater = 0
-const TARGET_FPS=1
+const TargetFps =2
+const PerformTrace = false
 
 var pixelCntSli [numSimUpdater]int64
 
@@ -72,26 +74,18 @@ func printFps() {
 }
 
 func printPixel() {
-	runtime.LockOSThread()
 	for isRunning() {
 		time.Sleep(time.Second * 1)
 		var sumPixelCount int64
-		/*for i:=0 ;i<numSimUpdater;i++ {
-			sumPixelCount+=pixelCntSli[i]
-			pixelCntSli[i]=0
-		}
-		//pixelCount := atomic.LoadInt64(&sumPixelCount) */
+
 		sumPixelCount=pixelXXCnt
 
 		log.Printf("%v", humanize.Comma(sumPixelCount))
 		pixelXXCnt=0
-		//atomic.StoreInt64(&pixelCnt, 0)
 		atomic.AddInt64(&totalPixelCnt, sumPixelCount)
 	}
-	runtime.UnlockOSThread()
 }
 
-//stats
 
 func checkError(err error) {
 	if err != nil {
@@ -319,7 +313,22 @@ func checkSdlError() {
 }
 
 func main() {
-	runtime.GOMAXPROCS(16 + runtime.NumCPU())
+
+	if PerformTrace {
+		f, err := os.Create("trace.out")
+		if err != nil {
+			panic(err)
+		}
+		defer f.Close()
+
+		err = trace.Start(f)
+		if err != nil {
+			panic(err)
+		}
+		defer trace.Stop()
+	}
+
+	runtime.GOMAXPROCS(8+16 * runtime.NumCPU())
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
@@ -353,7 +362,7 @@ func main() {
 	go printPixel()
 	go printFps()
 
-	ticker := time.NewTicker(1000 / TARGET_FPS * time.Millisecond) //target 30fps
+	ticker := time.NewTicker(1000 / TargetFps * time.Millisecond) //target 30fps
 	go func() {
 		for range ticker.C {
 			if isRunning() {

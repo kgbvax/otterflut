@@ -16,8 +16,8 @@ import (
 var port = "1234"
 var connLimit = 1024
 
-const SOCKET_READ_BUFFER_SZ = 32768
-const SOCKER_READ_CHUNK_SZ = 16384
+const SOCKET_READ_BUFFER_SZ = 1024 *1024
+const SOCKER_READ_CHUNK_SZ  = 512  *1024 // keep in mind that we may need this for thousands of connections
 
 const SINGLE_PIXEL_LL = 18 //PX nnn nnn rrggbb_
 const READ_PIXEL_B = 10
@@ -57,19 +57,24 @@ func findNl(buf []byte) int {
 
 // Handles incoming requests.
 // Handles closing of the connection.
-func handleConnection(conn net.Conn) {
+func handleConnection(conn *net.TCPConn) {
+	runtime.LockOSThread() //uh oh, one thread per connection is not that great ;-)
+
+
 	// Defer all close logic.
 	// Using a closure makes it easy to group logic as well as execute serially
 	// and avoid the deferred LIFO exec order.
 	defer func() {
 		// Since handleConnection is run in a go routine,
 		// it manages the closing of our net.Conn.
+		runtime.UnlockOSThread()
 		conn.Close()
 	}()
 
 	var buffer = make([]byte, SOCKER_READ_CHUNK_SZ)
 
 	for { //TODO this most likely needs tuning
+
 
 		n, err := conn.Read(buffer)
 
@@ -78,7 +83,6 @@ func handleConnection(conn net.Conn) {
 			log.Printf("error reading: %v", err)
 			if err == io.EOF {
 				log.Printf("connection broken")
-				conn.Close()
 				return
 			}
 		} else {
@@ -88,14 +92,13 @@ func handleConnection(conn net.Conn) {
 				nlAt := findNl(buffer[offset:n]) //search in slice from (last) start to
 				if nlAt > 0 { // -1 not found and 0 (zero length) to be ignored
 					//log.Printf("offset: %v, nlAt:%v n:%v",offset,nlAt,n)
-					msg := buffer[offset : offset+nlAt-1]  //without NL
+					msg := buffer[offset : offset+nlAt]  //without NL
 
 
-					//log.Printf("process >>%v<<", s_msg)
+					//log.Printf("process >>%v<<", string(msg))
 					if len(msg) > 0 {
 						if msg[0] == 'P' {
-
-							pfparse(msg)
+							 pfparse(msg)
 						} else {
 							s_msg:=string(msg)
 							s2 := strings.ToLower(s_msg)
@@ -131,7 +134,7 @@ func handleConnection(conn net.Conn) {
 // acceptConns uses the semaphore channel on the counter to rate limit.
 // New connections get sent on the returned channel.
 func acceptConns(srv *net.TCPListener) <-chan *net.TCPConn {
-	conns := make(chan *net.TCPConn)
+	conns := make(chan *net.TCPConn,42)
 
 	go func() {
 		for isRunning() {
@@ -173,6 +176,7 @@ func Server(quit chan int) { //todo add mechanism to terminate, channel?
 
 	// Receive new connections on an unbuffered channel.
 	conns := acceptConns(srv)
+
 	for {
 		select {
 		case conn := <-conns:
