@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"github.com/dustin/go-humanize"
 	"github.com/veandco/go-sdl2/sdl"
 	"log"
 	"os"
@@ -18,6 +17,7 @@ import (
 	"strconv"
 	"sync"
 	"runtime/trace"
+	"github.com/dustin/go-humanize"
 )
 
 type opix struct {
@@ -63,28 +63,17 @@ var globalWinUpdateLock = sync.Mutex{}
 
 
 func printFps() {
-
-	for isRunning() {
-		time.Sleep(time.Second * 1)
-		log.Printf("frames=%v\b", atomic.LoadUint64(&frames))
-
-		atomic.StoreUint64(&frames, 0)
-	}
-	log.Print("Exit printFps")
-}
-
-func printPixel() {
 	for isRunning() {
 		time.Sleep(time.Second * 1)
 		var sumPixelCount int64
-
 		sumPixelCount=pixelXXCnt
-
-		log.Printf("%v", humanize.Comma(sumPixelCount))
+		log.Printf("errors=%v frames=%v pixel: total=%v last=%v ", errorCnt, atomic.LoadUint64(&frames),humanize.Comma(totalPixelCnt),humanize.Comma(sumPixelCount))
 		pixelXXCnt=0
-		atomic.AddInt64(&totalPixelCnt, sumPixelCount)
+		totalPixelCnt+=sumPixelCount
+		atomic.StoreUint64(&frames, 0)
 	}
 }
+
 
 
 func checkError(err error) {
@@ -216,7 +205,7 @@ func windowInit() {
 
 	info,err:=renderer.GetInfo()
 	log.Printf("selected renderer: %v",info.Name)
-	log.Printf("max texgure size: %vx%v",info.MaxTextureWidth,info.MaxTextureHeight)
+	log.Printf("max texture size: %vx%v",info.MaxTextureWidth,info.MaxTextureHeight)
 
 
 	log.Print("create texture")
@@ -359,7 +348,6 @@ func main() {
 	}
 
 	windowInit()
-	go printPixel()
 	go printFps()
 
 	ticker := time.NewTicker(1000 / TargetFps * time.Millisecond) //target 30fps
