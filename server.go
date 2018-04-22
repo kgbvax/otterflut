@@ -24,6 +24,8 @@ const SINGLE_PIXEL_LL = 18 //PX nnn nnn rrggbb_
 const READ_PIXEL_B = 10
 const readChunkSize = SINGLE_PIXEL_LL * READ_PIXEL_B
 
+const lockThread = false
+
 // Or as a kind user on reddit refactored:
 func checkErr(err error) {
 	if err != nil {
@@ -37,7 +39,9 @@ func checkErr(err error) {
 // Handles incoming requests.
 // Handles closing of the connection.
 func handleConnection(conn *net.TCPConn) {
-	runtime.LockOSThread() //uh oh, one thread per connection is not that great ;-)
+	if lockThread {
+		runtime.LockOSThread()
+	} //uh oh, one thread per connection is not that great ;-)
 
 	// Defer all close logic.
 	// Using a closure makes it easy to group logic as well as execute serially
@@ -45,7 +49,9 @@ func handleConnection(conn *net.TCPConn) {
 	defer func() {
 		// Since handleConnection is run in a go routine,
 		// it manages the closing of our net.Conn.
-		runtime.UnlockOSThread()
+		if lockThread {
+			runtime.UnlockOSThread()
+		}
 		conn.Close()
 	}()
 
