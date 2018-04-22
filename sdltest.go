@@ -34,12 +34,10 @@ var H uint32 = 600
 
 var lines []string
 
-
 const numSimUpdater = 0
-const TargetFps =2
+const TargetFps = 3
 const PerformTrace = false
 
-var pixelCntSli [numSimUpdater]int64
 
 var pixelXXCnt int64
 var totalPixelCnt int64
@@ -69,10 +67,11 @@ func printFps() {
 	for isRunning() {
 		time.Sleep(time.Second * 1)
 		var sumPixelCount int64
-		sumPixelCount=pixelXXCnt
+		sumPixelCount=atomic.LoadInt64(&pixelXXCnt)
 		log.Printf("errors (out of range:%v parse:%v) frames=%v msg: total=%v last=%v ", outOfRangeErrorCnt, errorCnt, atomic.LoadUint64(&frames),humanize.Comma(totalPixelCnt),humanize.Comma(sumPixelCount))
-		pixelXXCnt=0
+
 		totalPixelCnt+=sumPixelCount
+		atomic.StoreInt64(&pixelXXCnt,0)
 		atomic.StoreUint64(&frames, 0)
 	}
 }
@@ -275,9 +274,8 @@ func updateSim(gridx int) {
 
 	for isRunning() {
 		for _, element := range lines {
-
 			pfparse([]byte(element))
-			pixelCntSli[gridx]+=1
+
 		}
 		time.Sleep(time.Duration(rand.Int63n(10)) * time.Millisecond) // some random delay
 	}

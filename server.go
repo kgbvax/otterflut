@@ -1,24 +1,24 @@
 package main
 
 import (
-	"os"
-	"net"
 	"log"
+	"net"
+	"runtime"
+	"io"
+	"bytes"
+	"strings"
+	"fmt"
+	"os"
+	"sync/atomic"
 	"os/signal"
 	"syscall"
-	"fmt"
-
-	"runtime"
-	"strings"
-	"io"
-	"sync/atomic"
 )
 
 var port = "1234"
 var connLimit = 1024
 
-const SOCKET_READ_BUFFER_SZ = 1024 *1024
-const SOCKER_READ_CHUNK_SZ  = 512  *1024 // keep in mind that we may need this for thousands of connections
+const SOCKET_READ_BUFFER_SZ = 1024 * 1024
+const SOCKER_READ_CHUNK_SZ = 512 * 1024 // keep in mind that we may need this for thousands of connections
 
 const SINGLE_PIXEL_LL = 18 //PX nnn nnn rrggbb_
 const READ_PIXEL_B = 10
@@ -34,33 +34,10 @@ func checkErr(err error) {
 
 
 
-//reading gameplan
-//read into buffer up to X
-//traverse buffer looking for \n
-//found: print slice
-//  continue scanning
-//end reached and not \n:  copy "remains" to beginning of buffer (<- sucks) and read again
-// continue scanning: if no \n found: pathological, discard
-//
-//options:
-// * can we read into a ring-buffer, would save copies?
-// * are "bytes" faster than strings?
-
-/* scan slice for \n, returns index of \n or -1 if not found */
-func findNl(buf []byte) int {
-	for i, v := range buf {  //classic "for" loop instead of range is not faster
-		if v == '\n' {
-			return i
-		}
-	}
-	return -1
-}
-
 // Handles incoming requests.
 // Handles closing of the connection.
 func handleConnection(conn *net.TCPConn) {
 	runtime.LockOSThread() //uh oh, one thread per connection is not that great ;-)
-
 
 	// Defer all close logic.
 	// Using a closure makes it easy to group logic as well as execute serially
@@ -74,15 +51,14 @@ func handleConnection(conn *net.TCPConn) {
 
 	var buffer = make([]byte, SOCKER_READ_CHUNK_SZ)
 
-	for { //TODO this most likely needs tuning
+	for {  // forever: read from socket and process contents
 		var messagesProcessedInChunk int64
 
 		n, err := conn.Read(buffer)
 
-
 		//log.Printf("readn %v", n)
 		if err != nil {
-			log.Printf("error reading: %v", err)
+			//log.Printf("error reading: %v", err)
 			if err == io.EOF {
 				log.Printf("connection broken")
 				return
@@ -91,23 +67,23 @@ func handleConnection(conn *net.TCPConn) {
 			offset := 0
 
 			for {
-				nlAt := findNl(buffer[offset:n]) //search in slice from (last) start to
+				nlAt := bytes.IndexByte(buffer[offset:n],'\n')
 				if nlAt > 0 { // -1 not found and 0 (zero length) to be ignored
 					//log.Printf("offset: %v, nlAt:%v n:%v",offset,nlAt,n)
-					msg := buffer[offset : offset+nlAt]  //without NL
-
+					msg := buffer[offset : offset+nlAt] //without NL
 
 					//log.Printf("process >>%v<<", string(msg))
 					if len(msg) > 0 {
-						messagesProcessedInChunk++
-						if msg[0] == 'P' {
-							 pfparse(msg)
 
-						} else {
-							s_msg:=string(msg)
+						if msg[0] == 'P' {
+							pfparse(msg)
+							messagesProcessedInChunk++
+
+						} else { // not a PX
+							s_msg := string(msg)
 							s2 := strings.ToLower(s_msg)
 							if strings.Contains(s2, "size") {
-								_,err= conn.Write([]byte(fmt.Sprintf("SIZE %v %v\n", W, H)))
+								_, err = conn.Write([]byte(fmt.Sprintf("SIZE %v %v\n", W, H)))
 								//TODO check err
 							}
 							if strings.Contains(s2, "help") {
@@ -118,12 +94,12 @@ func handleConnection(conn *net.TCPConn) {
 									"'HELP' - this text\n" +
 									"'SIZE' - get canvas size ,responds with 'SIZE X Y'\n" +
 									"\nReading pixels is not supported, alpha is not implemented yet\n"
-								_,err=conn.Write([]byte(HELP))
+								_, err = conn.Write([]byte(HELP))
 								//TODO check err
 							}
 						}
 						offset += nlAt + 1
-					} else {  // zero length msg
+					} else { // zero length msg
 						break
 					}
 				} else { //no NL found
@@ -131,16 +107,15 @@ func handleConnection(conn *net.TCPConn) {
 
 				}
 			}
-			atomic.AddInt64(&pixelXXCnt,messagesProcessedInChunk)
+			atomic.AddInt64(&pixelXXCnt, messagesProcessedInChunk)
 		}
 	}
 }
 
-
 // acceptConns uses the semaphore channel on the counter to rate limit.
 // New connections get sent on the returned channel.
 func acceptConns(srv *net.TCPListener) <-chan *net.TCPConn {
-	conns := make(chan *net.TCPConn,42)
+	conns := make(chan *net.TCPConn, 42)
 
 	go func() {
 		for isRunning() {
@@ -168,14 +143,14 @@ func Server(quit chan int) { //todo add mechanism to terminate, channel?
 	addrs, _ := net.LookupHost(hostname)
 	log.Printf("my ips: %v", addrs)
 
-	service := ":"+port
+	service := ":" + port
 	tcpAddr, err := net.ResolveTCPAddr("tcp", service)
 	checkError(err)
 
-	srv,err := net.ListenTCP("tcp",tcpAddr)
+	srv, err := net.ListenTCP("tcp", tcpAddr)
 	checkErr(err)
 
- 	defer srv.Close()
+	defer srv.Close()
 
 	// Listen for termination signals.
 	sig := make(chan os.Signal)
