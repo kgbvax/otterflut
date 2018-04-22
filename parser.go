@@ -44,16 +44,11 @@ func nextNonWs(stri []byte, initialStart int) (int, int) {
 // Swiftly parse an Uint32
 // no bounds checks we don't care (at this point)
 func parsUint(m []byte) uint32 {
-	var n uint32
-
-	/*	l := len(m)
-	for i := 0; i < l; i++ {
-		n = n*10 + uint32(m[i]-'0')
-	} */
+	var n int
 	for _, v := range m {
-		n = n*10 + uint32(v-'0')
+		n = n*10 + int(v-'0')
 	}
-	return n
+	return uint32(n)
 }
 
 func pfparse(m []byte) {
