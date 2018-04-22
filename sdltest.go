@@ -35,7 +35,7 @@ var H uint32 = 600
 var lines []string
 
 
-const numSimUpdater = 0
+const numSimUpdater = 1
 const TargetFps =2
 const PerformTrace = false
 

@@ -3,23 +3,23 @@ package main
 import "sync/atomic"
 
 //lookup table for hex digits
-var hexval = [256]uint8{'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5,
+var hexval32 = [256]uint32{'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5,
 	'6': 6, '7': 7, '8': 8, '9': 9, 'a': 10, 'A': 10, 'b': 11, 'B': 11, 'c': 12, 'C': 12, 'd': 13, 'D': 13,
 	'e': 14, 'E': 14, 'f': 15, 'F': 15}
 
 //quickly  parse a 3 byte hex number
 func parseHex3(m []byte) uint32 {
 	//MUL version, compiles to shifts
-	return 0x100000*uint32(hexval[m[0]]) + 0x010000*uint32(hexval[m[1]]) + 0x001000*uint32(hexval[m[2]]) +
-		0x000100*uint32(hexval[m[3]]) + 0x000010*uint32(hexval[m[4]]) + uint32(hexval[m[5]])
+	return 0x100000*hexval32[m[0]] + 0x010000*hexval32[m[1]] + 0x001000*hexval32[m[2]] +
+		0x000100*hexval32[m[3]] + 0x000010*hexval32[m[4]] + hexval32[m[5]]
 }
 
 //quickly parse a 4 byte hex number
 func parseHex4(m []byte) uint32 {
 	//MUL version
-	return 0x10000000*uint32(hexval[m[0]]) + 0x01000000*uint32(hexval[m[1]]) + 0x00100000*uint32(hexval[m[2]]) +
-		0x00010000*uint32(hexval[m[3]]) + 0x00001000*uint32(hexval[m[4]]) + 0x00000100*uint32(hexval[m[5]]) +
-		0x00000010*uint32(hexval[m[6]]) + uint32(hexval[m[7]])
+	return 0x10000000*hexval32[m[0]] + 0x01000000*hexval32[m[1]] + 0x00100000*hexval32[m[2]] +
+		0x00010000*hexval32[m[3]] + 0x00001000*hexval32[m[4]] + 0x00000100*hexval32[m[5]] +
+		0x00000010*hexval32[m[6]] + hexval32[m[7]]
 
 }
 
