@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 	"io"
+	"sync/atomic"
 )
 
 var port = "1234"
@@ -74,9 +75,10 @@ func handleConnection(conn *net.TCPConn) {
 	var buffer = make([]byte, SOCKER_READ_CHUNK_SZ)
 
 	for { //TODO this most likely needs tuning
-
+		var messagesProcessedInChunk int64
 
 		n, err := conn.Read(buffer)
+
 
 		//log.Printf("readn %v", n)
 		if err != nil {
@@ -97,9 +99,9 @@ func handleConnection(conn *net.TCPConn) {
 
 					//log.Printf("process >>%v<<", string(msg))
 					if len(msg) > 0 {
+						messagesProcessedInChunk++
 						if msg[0] == 'P' {
 							 pfparse(msg)
-							 conn.SyscallConn()
 
 						} else {
 							s_msg:=string(msg)
@@ -126,8 +128,10 @@ func handleConnection(conn *net.TCPConn) {
 					}
 				} else { //no NL found
 					break //TODO reshuffle buffer and continue to read MORE
+
 				}
 			}
+			atomic.AddInt64(&pixelXXCnt,messagesProcessedInChunk)
 		}
 	}
 }

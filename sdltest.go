@@ -10,14 +10,14 @@ import (
 	"sync/atomic"
 	"time"
 	"unsafe"
-	"io/ioutil"
-	"strings"
 	"math/rand"
 	_ "net/http/pprof"
 	"strconv"
 	"sync"
 	"runtime/trace"
 	"github.com/dustin/go-humanize"
+	"io/ioutil"
+	"strings"
 )
 
 type opix struct {
@@ -35,7 +35,7 @@ var H uint32 = 600
 var lines []string
 
 
-const numSimUpdater = 1
+const numSimUpdater = 0
 const TargetFps =2
 const PerformTrace = false
 
@@ -70,7 +70,7 @@ func printFps() {
 		time.Sleep(time.Second * 1)
 		var sumPixelCount int64
 		sumPixelCount=pixelXXCnt
-		log.Printf("errors (out of range:%v parse:%v) frames=%v pixel: total=%v last=%v ", outOfRangeErrorCnt, errorCnt, atomic.LoadUint64(&frames),humanize.Comma(totalPixelCnt),humanize.Comma(sumPixelCount))
+		log.Printf("errors (out of range:%v parse:%v) frames=%v msg: total=%v last=%v ", outOfRangeErrorCnt, errorCnt, atomic.LoadUint64(&frames),humanize.Comma(totalPixelCnt),humanize.Comma(sumPixelCount))
 		pixelXXCnt=0
 		totalPixelCnt+=sumPixelCount
 		atomic.StoreUint64(&frames, 0)
@@ -101,7 +101,7 @@ func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 		return // ignore
 	}
 
-	atomic.AddInt64(&pixelXXCnt,1)
+	//atomic.AddInt64(&pixelXXCnt,1)
 	//pixelXXCnt+=1
 }
 
@@ -328,10 +328,6 @@ func main() {
 
 	sdl.ClearError()
 
-	bdata, err := ioutil.ReadFile("test.pxfl")
-	checkError(err)
-	s := string(bdata)
-	lines = strings.Split(s, "\n")
 
 	flag.Parse()
 	if *cpuprofile != "" {
@@ -370,8 +366,15 @@ func main() {
 	go Server(serverQuit)
 
 	//simulated messages
-	for i := 0; i < numSimUpdater; i++ {
-		go updateSim(i)
+	if numSimUpdater>0 {
+		bdata, err := ioutil.ReadFile("test.pxfl")
+		checkError(err)
+		s := string(bdata)
+		lines = strings.Split(s, "\n")
+
+		for i := 0; i < numSimUpdater; i++ {
+			go updateSim(i)
+		}
 	}
 
 	sdlEventLoop()
