@@ -1,6 +1,8 @@
 package main
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+)
 
 //lookup table for hex digits
 var hexval32 = [256]uint32{'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5,
@@ -88,6 +90,11 @@ func pfparse(m []byte) {
 		case 8:
 			color = parseHex4(hexstr)
 		default:
+			wrongLen:=len(hexstr)
+			if wrongLen <6 { //to short, could try to fix this by padding with leading 0s
+				//TODO maybe later or maybe never
+			}
+			//log.Printf("pfparse err >%v<",string(m))
 			atomic.AddInt64(&errorCnt, 1)
 			return
 	}

@@ -45,6 +45,8 @@ var pixelXXCnt int64
 var totalPixelCnt int64
 
 var pixels *[]uint32
+var maxOffset uint32
+
 var pixelsArr []byte
 var sdlTexture *sdl.Texture
 var renderer *sdl.Renderer
@@ -84,15 +86,22 @@ func checkError(err error) {
 }
 
 func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
-	if x >= W || y >= H {
-		return // ignore
-	}
+
 	/*	//sdlcol:=sdl.Color{R: uint8((color & 0xff0000) >> 16),G: uint8((color & 0xff00) >> 8), B: uint8(color & 0xff), A: uint8((color&0xff000000)>>24) }
 		gfx.PixelRGBA(ren,int32(x),int32(y),255,255,0,255) */
-	(*pixels)[y*W+x] = color //uint32((color & 0xff0000) >> 16) | uint32((color & 0xff00) >> 8) | uint32(color & 0xff)
+	offset:=y*W+x
 
-	pixelXXCnt+=1
+	if offset<=maxOffset { //out of bounds
+		(*pixels)[offset] = color //uint32((color & 0xff0000) >> 16) | uint32((color & 0xff00) >> 8) | uint32(color & 0xff)
 
+	} else {
+		//log.Printf("pixel out of range %v %v ",x,y)
+		atomic.AddInt64(&errorCnt, 1)
+		return // ignore
+	}
+
+	atomic.AddInt64(&pixelXXCnt,1)
+	//pixelXXCnt+=1
 }
 
 
@@ -125,10 +134,8 @@ func updateWin() {
 	globalWinUpdateLock.Lock()
 
 	frames++
-
 	//window.UpdateSurface()
 	sdlTexture.Unlock()
-
 
 	sdlTexture.Update(allDisplay,pixelsArr,int(W*4))
 
@@ -140,8 +147,6 @@ func updateWin() {
 	sdlTexture.Lock(allDisplay)
 
 	globalWinUpdateLock.Unlock()
-
-
 }
 
 func windowInit() {
@@ -217,8 +222,10 @@ func windowInit() {
 	checkSdlError()
 	//sdlTexture.Lock(nil)
 
+	maxOffset= W*H
+
 	pixelsArr = make ([]byte,W*H*4) //the actual pixel buffer hidden in a golang array
-	pixels=(*[]uint32)(unsafe.Pointer(&pixelsArr))
+	pixels=(*[]uint32)(unsafe.Pointer(&pixelsArr)) //wrangle into array of uint32
 
 }
 
@@ -294,7 +301,6 @@ func memProfileWriter() {
 
 func checkSdlError() {
 	err:=sdl.GetError()
-
 	if err!=nil {
 		log.Printf("sdl: %v",err)
 		sdl.ClearError()
@@ -302,7 +308,6 @@ func checkSdlError() {
 }
 
 func main() {
-
 	if PerformTrace {
 		f, err := os.Create("trace.out")
 		if err != nil {
@@ -327,16 +332,16 @@ func main() {
 	checkError(err)
 	s := string(bdata)
 	lines = strings.Split(s, "\n")
-	//log.Println(http.ListenAndServe("localhost:6060", nil))
 
 	flag.Parse()
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
+
 		if err != nil {
 			log.Fatal("could not create CPU profile: ", err)
 		}
 		pprof.StopCPUProfile()
-
+		runtime.SetCPUProfileRate(2000)
 		if err := pprof.StartCPUProfile(f); err != nil {
 			log.Fatal("could not start CPU profile: ", err)
 		}
