@@ -341,8 +341,8 @@ func main() {
 		if err != nil {
 			log.Fatal("could not create CPU profile: ", err)
 		}
-		pprof.StopCPUProfile()
-		runtime.SetCPUProfileRate(2000)
+
+		runtime.SetCPUProfileRate(200)
 		if err := pprof.StartCPUProfile(f); err != nil {
 			log.Fatal("could not start CPU profile: ", err)
 		}
