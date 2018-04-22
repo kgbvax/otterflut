@@ -58,6 +58,7 @@ var window *sdl.Window=nil
 
 var frames uint64
 var errorCnt int64
+var outOfRangeErrorCnt int64
 
 var serverQuit = make(chan int)
 
@@ -69,7 +70,7 @@ func printFps() {
 		time.Sleep(time.Second * 1)
 		var sumPixelCount int64
 		sumPixelCount=pixelXXCnt
-		log.Printf("errors=%v frames=%v pixel: total=%v last=%v ", errorCnt, atomic.LoadUint64(&frames),humanize.Comma(totalPixelCnt),humanize.Comma(sumPixelCount))
+		log.Printf("errors (out of range:%v parse:%v) frames=%v pixel: total=%v last=%v ", outOfRangeErrorCnt, errorCnt, atomic.LoadUint64(&frames),humanize.Comma(totalPixelCnt),humanize.Comma(sumPixelCount))
 		pixelXXCnt=0
 		totalPixelCnt+=sumPixelCount
 		atomic.StoreUint64(&frames, 0)
@@ -96,7 +97,7 @@ func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 
 	} else {
 		//log.Printf("pixel out of range %v %v ",x,y)
-		atomic.AddInt64(&errorCnt, 1)
+		atomic.AddInt64(&outOfRangeErrorCnt, 1)
 		return // ignore
 	}
 
