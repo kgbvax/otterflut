@@ -47,7 +47,7 @@ func checkErr(err error) {
 
 /* scan slice for \n, returns index of \n or -1 if not found */
 func findNl(buf []byte) int {
-	for i, v := range buf {
+	for i, v := range buf {  //classic "for" loop instead of range is not faster
 		if v == '\n' {
 			return i
 		}

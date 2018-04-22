@@ -4,8 +4,8 @@ import "sync/atomic"
 
 //lookup table for hex digits
 var hexval32 = [256]uint32{'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5,
-	'6': 6, '7': 7, '8': 8, '9': 9, 'a': 10, 'A': 10, 'b': 11, 'B': 11, 'c': 12, 'C': 12, 'd': 13, 'D': 13,
-	'e': 14, 'E': 14, 'f': 15, 'F': 15}
+	'6': 6, '7': 7, '8': 8, '9': 9, 'a': 0xA, 'A': 0xA, 'b': 0xB, 'B': 0xB, 'c': 0xC, 'C': 0xC, 'd': 0xD, 'D': 0xD,
+	'e': 0xE, 'E': 0xE, 'f': 0xF, 'F': 0xF}
 
 //quickly  parse a 3 byte hex number
 func parseHex3(m []byte) uint32 {
@@ -40,9 +40,8 @@ func nextNonWs(stri []byte, initialStart int) (int, int) {
 	return start, i
 }
 
-
-// Swiftly parse an Uint32
-// no bounds checks we don't care (at this point)
+// Parse an Uint
+// no bounds checks we don't care (at this point), works for 0..9999
 // loop-less edition, mucho rapido
 func parsUint(m []byte) uint32 {
 	l := len(m)
@@ -69,7 +68,7 @@ func parsUint(m []byte) uint32 {
 	panic("parsUint32 invalid length")
 }
 
-
+//Parse & performf a "PX" line
 func pfparse(m []byte) {
 
 	var color uint32
@@ -81,15 +80,17 @@ func pfparse(m []byte) {
 	y := parsUint(m[start:end])
 
 	start, end = nextNonWs(m, end)
-	hexstr := m[start:end]
 
-	if len(hexstr) == 6 {
-		color = parseHex3(hexstr)
-	} else if len(hexstr) == 8 {
-		color = parseHex4(hexstr)
-	} else {
-		atomic.AddInt64(&errorCnt, 1)
-		return
+	hexstr := m[start:end]
+	switch len(hexstr) {
+		case 6:
+			color = parseHex3(hexstr)
+		case 8:
+			color = parseHex4(hexstr)
+		default:
+			atomic.AddInt64(&errorCnt, 1)
+			return
 	}
+
 	setPixel(x, y, color)
 }
