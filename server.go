@@ -99,6 +99,8 @@ func handleConnection(conn *net.TCPConn) {
 					if len(msg) > 0 {
 						if msg[0] == 'P' {
 							 pfparse(msg)
+							 conn.SyscallConn()
+
 						} else {
 							s_msg:=string(msg)
 							s2 := strings.ToLower(s_msg)
@@ -145,6 +147,7 @@ func acceptConns(srv *net.TCPListener) <-chan *net.TCPConn {
 				continue
 			}
 			conn.SetReadBuffer(SOCKET_READ_BUFFER_SZ)
+			conn.SetNoDelay(false)
 			conns <- conn
 		}
 	}()
