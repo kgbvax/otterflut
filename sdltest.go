@@ -99,14 +99,13 @@ func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 		atomic.AddInt64(&outOfRangeErrorCnt, 1)
 		return // ignore
 	}
-
-	//atomic.AddInt64(&pixelXXCnt,1)
-	//pixelXXCnt+=1
 }
 
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
 var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
+var tracecall = flag.String("trace", "", "write trace profile to `file`")
+
 
 func printSurfaceInfo(sur *sdl.Surface, name string) {
 	var formatName = "-"
@@ -169,10 +168,11 @@ func windowInit() {
 	numModes,err:=sdl.GetNumDisplayModes(0)
 	for i:=0; i<numModes; i++ {
 		mode,_:=sdl.GetDisplayMode(0,i)
+
 		log.Printf("mode %vx%v@%v f:%v",mode.W,mode.H,mode.RefreshRate,mode.Format)
 	}
 
-	numdrv, _ := sdl.GetNumRenderDrivers()
+	numdrv,err := sdl.GetNumRenderDrivers()
 	for i := 0; i < numdrv; i++ {
 		var rinfo sdl.RendererInfo
 		sdl.GetRenderDriverInfo(i, &rinfo)
@@ -188,8 +188,8 @@ func windowInit() {
 	//sdl.DisableScreenSaver()
 
 	//checkSdlError()
+ 	displayBounds,err := sdl.GetDisplayBounds(0)
 
-	displayBounds, err := sdl.GetDisplayBounds(0)
 	checkErr(err)
 	log.Printf("display: %vx%v", displayBounds.W, displayBounds.H)
 
@@ -242,8 +242,6 @@ func stopRunning() {
 		}
 	}
 }
-
-
 
 func sdlEventLoop() {
 	for isRunning() {
@@ -378,5 +376,4 @@ func main() {
 	sdlEventLoop()
 
 	(*window).Destroy()
-
 }

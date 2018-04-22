@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"os/signal"
 	"syscall"
+	"github.com/mailru/easygo/netpoll"
+	"io/ioutil"
 )
 
 var port = "1234"
@@ -33,8 +35,53 @@ func checkErr(err error) {
 	}
 }
 
+func handlePolledEv(buffer []byte) {
+	var messagesProcessedInChunk int64 = 0
 
+	offset := 0
+	n := len(buffer)
 
+	for {
+		nlAt := bytes.IndexByte(buffer[offset:n], '\n')
+		if nlAt > 0 { // -1 not found and 0 (zero length) to be ignored
+			//log.Printf("offset: %v, nlAt:%v n:%v",offset,nlAt,n)
+			msg := buffer[offset : offset+nlAt] //without NL
+
+			//log.Printf("process >>%v<<", string(msg))
+			if len(msg) > 0 {
+
+				if msg[0] == 'P' {
+					pfparse(msg)
+					messagesProcessedInChunk++
+
+				} else { // not a PX
+					/*	s_msg := string(msg)
+						s2 := strings.ToLower(s_msg)
+						if strings.Contains(s2, "size") {
+							_, err := conn.Write([]byte(fmt.Sprintf("SIZE %v %v\n", W, H)))
+							//TODO check err
+						}
+						if strings.Contains(s2, "help") {
+							hostname, _ := os.Hostname()
+							HELP := "OTTERFLUT (github.com/kgbvax/otterflut) on " + hostname + " (" + runtime.GOARCH + "/" + runtime.Version() +
+								")\nCommands:\n" +
+								"'PX x y rrggbb' set a pixel, where x,y = decimal postitive integer and colors are hex, hex values need leading zeros\n" +
+								"'HELP' - this text\n" +
+								"'SIZE' - get canvas size ,responds with 'SIZE X Y'\n" +
+								"\nReading pixels is not supported, alpha is not implemented yet\n"
+							_, err := conn.Write([]byte(HELP))
+							//TODO check err
+					*/
+				}
+			}
+			offset += nlAt + 1
+		} else { // nothing more
+			break
+		}
+	}
+	atomic.AddInt64(&pixelXXCnt, messagesProcessedInChunk)
+
+}
 
 // Handles incoming requests.
 // Handles closing of the connection.
@@ -57,7 +104,7 @@ func handleConnection(conn *net.TCPConn) {
 
 	var buffer = make([]byte, SOCKER_READ_CHUNK_SZ)
 
-	for {  // forever: read from socket and process contents
+	for { // forever: read from socket and process contents
 		var messagesProcessedInChunk int64
 
 		n, err := conn.Read(buffer)
@@ -73,7 +120,7 @@ func handleConnection(conn *net.TCPConn) {
 			offset := 0
 
 			for {
-				nlAt := bytes.IndexByte(buffer[offset:n],'\n')
+				nlAt := bytes.IndexByte(buffer[offset:n], '\n')
 				if nlAt > 0 { // -1 not found and 0 (zero length) to be ignored
 					//log.Printf("offset: %v, nlAt:%v n:%v",offset,nlAt,n)
 					msg := buffer[offset : offset+nlAt] //without NL
@@ -133,6 +180,33 @@ func acceptConns(srv *net.TCPListener) <-chan *net.TCPConn {
 			}
 			conn.SetReadBuffer(SOCKET_READ_BUFFER_SZ)
 			conn.SetNoDelay(false)
+			desc, err := netpoll.Handle(conn, netpoll.EventRead|netpoll.EventEdgeTriggered)
+			if err != nil {
+				// handle error
+			}
+			poller, err := netpoll.New(nil)
+			if err != nil {
+				// handle error
+			}
+
+			// Get netpoll descriptor with EventRead|EventEdgeTriggered.
+			descriptor := netpoll.Must(netpoll.HandleRead(conn))
+
+			poller.Start(descriptor, func(ev netpoll.Event) {
+				if ev&netpoll.EventReadHup != 0 {
+					poller.Stop(desc)
+					conn.Close()
+					return
+				}
+
+				buffer, err := ioutil.ReadAll(conn)
+				handlePolledEv(buffer)
+				if err != nil {
+					// handle error
+					log.Printf("err %v", err) //TODO "handle"
+				}
+			})
+
 			conns <- conn
 		}
 	}()
