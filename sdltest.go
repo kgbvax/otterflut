@@ -36,10 +36,9 @@ var H uint32 = 600
 
 var lines []string
 
-const numSimUpdater = 0
+const numSimUpdater = 2
 const TargetFps = 10
 const PerformTrace = false
-
 
 var pixelXXCnt int64
 var totalPixelCnt int64
@@ -54,8 +53,7 @@ var allDisplay *sdl.Rect
 var font *ttf.Font
 
 var xrunning = true
-var window *sdl.Window=nil
-
+var window *sdl.Window = nil
 
 var frames uint64
 var errorCnt int64
@@ -64,25 +62,24 @@ var outOfRangeErrorCnt int64
 var serverQuit = make(chan int)
 
 var globalWinUpdateLock = sync.Mutex{}
-var statsMsg =""
+
+var statsMsg = "Please stand by."
 
 func printFps() {
 	for isRunning() {
 		time.Sleep(time.Second * 1)
 		var sumPixelCount int64
-		sumPixelCount=atomic.LoadInt64(&pixelXXCnt)
+		sumPixelCount = atomic.LoadInt64(&pixelXXCnt)
 
-		statsMsg := fmt.Sprintf("errors (out of range:%v parse:%v) frames=%v msg: total=%v last=%v ", outOfRangeErrorCnt, errorCnt, atomic.LoadUint64(&frames),humanize.Comma(totalPixelCnt),humanize.Comma(sumPixelCount))
+		statsMsg = fmt.Sprintf("OTTERFLUT IP: %v, PORT:%v\nSTATS ERR:out-of-range:%v parse:%v FPS=%v MSG:total=%v last=%v ", findMyIp(),port,outOfRangeErrorCnt, errorCnt, atomic.LoadUint64(&frames), humanize.Comma(totalPixelCnt), humanize.Comma(sumPixelCount))
 
 		log.Print(statsMsg)
 
-		totalPixelCnt+=sumPixelCount
-		atomic.StoreInt64(&pixelXXCnt,0)
+		totalPixelCnt += sumPixelCount
+		atomic.StoreInt64(&pixelXXCnt, 0)
 		atomic.StoreUint64(&frames, 0)
 	}
 }
-
-
 
 func checkError(err error) {
 	if err != nil {
@@ -95,9 +92,9 @@ func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 
 	/*	//sdlcol:=sdl.Color{R: uint8((color & 0xff0000) >> 16),G: uint8((color & 0xff00) >> 8), B: uint8(color & 0xff), A: uint8((color&0xff000000)>>24) }
 		gfx.PixelRGBA(ren,int32(x),int32(y),255,255,0,255) */
-	offset:=y*W+x
+	offset := y*W + x
 
-	if offset<=maxOffset { //out of bounds
+	if offset <= maxOffset { //out of bounds
 		(*pixels)[offset] = color //uint32((color & 0xff0000) >> 16) | uint32((color & 0xff00) >> 8) | uint32(color & 0xff)
 
 	} else {
@@ -107,11 +104,9 @@ func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 	}
 }
 
-
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
 var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
 var tracecall = flag.String("trace", "", "write trace profile to `file`")
-
 
 func printSurfaceInfo(sur *sdl.Surface, name string) {
 	var formatName = "-"
@@ -135,34 +130,44 @@ func printSurfaceInfo(sur *sdl.Surface, name string) {
 }
 
 func updateWin() {
+	var solid *sdl.Surface
+	var err error
 	globalWinUpdateLock.Lock()
+	defer globalWinUpdateLock.Unlock()
 
 	frames++
 	//window.UpdateSurface()
 	sdlTexture.Unlock()
+	defer sdlTexture.Lock(allDisplay)
 
-	sdlTexture.Update(allDisplay,pixelsArr,int(W*4))
+	sdlTexture.Update(allDisplay, pixelsArr, int(W*4))
+	renderer.Clear()
 
-	//renderer.Clear()
-	renderer.Copy(sdlTexture,allDisplay,allDisplay)
+	renderer.Copy(sdlTexture, allDisplay, allDisplay)
 
-	//gfx.StringColor(renderer,0,16,statsMsg,sdl.Color{255,255,255,255})
-	font.RenderUTF8Solid(statsMsg,sdl.Color{255,255,255,255})
+	if solid, err = font.RenderUTF8BlendedWrapped(statsMsg, sdl.Color{255, 255, 0, 200},int(allDisplay.W)); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to render text: %s\n", err)
+		return
+	}
+	defer solid.Free()
+
+	solidText, err := renderer.CreateTextureFromSurface(solid)
+	textBoundingBox := sdl.Rect{0, 0, solid.W, solid.H,}
+
+	checkErr(err)
+	renderer.Copy(solidText, &textBoundingBox, &sdl.Rect{20, 0, solid.W, solid.H})
+
 	renderer.Present()
 
-	//window.UpdateSurface()
-	sdlTexture.Lock(allDisplay)
-
-	globalWinUpdateLock.Unlock()
 }
 
 func windowInit() {
 	var err error
 
 	platform := sdl.GetPlatform()
-	workingDir,err:=os.Getwd()
+	workingDir, err := os.Getwd()
 
-	log.Printf("platform: %v CWD:%v",platform,workingDir)
+	log.Printf("platform: %v CWD:%v", platform, workingDir)
 	switch platform {
 	case "Linux":
 		//OpenGLES2
@@ -171,30 +176,28 @@ func windowInit() {
 		//sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION,0)
 	}
 
-
-	err=ttf.Init()
+	err = ttf.Init()
 	checkErr(err)
 
-	font,err=ttf.OpenFont("Inconsolata-Regular.ttf",16)
+	font, err = ttf.OpenFont("Inconsolata-Regular.ttf", 24)
 	checkErr(err)
 
+	numModes, err := sdl.GetNumDisplayModes(0)
+	for i := 0; i <= numModes; i++ {
+		mode, _ := sdl.GetDisplayMode(0, i)
 
-	numModes,err:=sdl.GetNumDisplayModes(0)
-	for i:=0; i<=numModes; i++ {
-		mode,_:=sdl.GetDisplayMode(0,i)
-
-		log.Printf("mode %vx%v@%v f:%v",mode.W,mode.H,mode.RefreshRate,mode.Format)
+		log.Printf("mode %vx%v@%v f:%v", mode.W, mode.H, mode.RefreshRate, mode.Format)
 	}
 
-	rendererIndex:=-1
-	numdrv,err := sdl.GetNumRenderDrivers()
+	rendererIndex := -1
+	numdrv, err := sdl.GetNumRenderDrivers()
 	for i := 0; i < numdrv; i++ {
 		var rinfo sdl.RendererInfo
 		sdl.GetRenderDriverInfo(i, &rinfo)
-		rendererName:=rinfo.Name
-		log.Printf("available renderer driver: #%v %v, flags:%b ",i, rendererName, rinfo.Flags)
-		if platform == "Mac OS X" && rendererName=="metal" {
-			rendererIndex=i
+		rendererName := rinfo.Name
+		log.Printf("available renderer driver: #%v %v, flags:%b ", i, rendererName, rinfo.Flags)
+		if platform == "Mac OS X" && rendererName == "metal" {
+			rendererIndex = i
 		}
 	}
 
@@ -203,46 +206,40 @@ func windowInit() {
 	}
 	checkSdlError()
 
-
 	//checkSdlError()
- 	displayBounds,err := sdl.GetDisplayBounds(0)
+	displayBounds, err := sdl.GetDisplayBounds(0)
 
 	checkErr(err)
 	log.Printf("display: %vx%v", displayBounds.W, displayBounds.H)
 
-	W=uint32(displayBounds.W)
-	H=uint32(displayBounds.H)
+	W = uint32(displayBounds.W)
+	H = uint32(displayBounds.H)
 	allDisplay = &sdl.Rect{0, 0, int32(W), int32(H)}
 
-
-	window, err = sdl.CreateWindow("otterflut", 0, 0,int32(W),int32(H),
-		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_FULLSCREEN | sdl.WINDOW_OPENGL)
-
+	window, err = sdl.CreateWindow("otterflut", 0, 0, int32(W), int32(H),
+		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_FULLSCREEN|sdl.WINDOW_OPENGL)
 
 	log.Print("create renderer")
-	renderer,err = sdl.CreateRenderer(window,rendererIndex,sdl.RENDERER_PRESENTVSYNC|sdl.RENDERER_ACCELERATED)
+	renderer, err = sdl.CreateRenderer(window, rendererIndex, sdl.RENDERER_PRESENTVSYNC|sdl.RENDERER_ACCELERATED)
 	checkErr(err)
 	checkSdlError()
 
+	info, err := renderer.GetInfo()
+	log.Printf("selected renderer: %v", info.Name)
+	log.Printf("max texture size: %vx%v", info.MaxTextureWidth, info.MaxTextureHeight)
 
-	info,err:=renderer.GetInfo()
-	log.Printf("selected renderer: %v",info.Name)
-	log.Printf("max texture size: %vx%v",info.MaxTextureWidth,info.MaxTextureHeight)
-
-
-	log.Print("create texture")
-	sdlTexture,err = renderer.CreateTexture(
+	sdlTexture, err = renderer.CreateTexture(
 		sdl.PIXELFORMAT_ARGB8888,
 		sdl.TEXTUREACCESS_STREAMING,
 		int32(W), int32(H))
-    checkErr(err)
+	checkErr(err)
 	checkSdlError()
 	//sdlTexture.Lock(nil)
 
-	maxOffset= W*H
+	maxOffset = W * H
 
-	pixelsArr = make ([]byte,W*H*4) //the actual pixel buffer hidden in a golang array
-	pixels=(*[]uint32)(unsafe.Pointer(&pixelsArr)) //wrangle into array of uint32
+	pixelsArr = make([]byte, W*H*4)                  //the actual pixel buffer hidden in a golang array
+	pixels = (*[]uint32)(unsafe.Pointer(&pixelsArr)) //wrangle into array of uint32
 
 	sdl.DisableScreenSaver()
 }
@@ -265,7 +262,7 @@ func stopRunning() {
 func sdlEventLoop() {
 	for isRunning() {
 		event := sdl.WaitEventTimeout(20)
-		if event!= nil {
+		if event != nil {
 			//log.Print(event)
 			switch event.(type) {
 			case *sdl.QuitEvent:
@@ -274,10 +271,10 @@ func sdlEventLoop() {
 				return
 			}
 		} else {
-			err:=sdl.GetError()
+			err := sdl.GetError()
 
-			if err!=nil {
-				log.Printf("sdl-event-loop: %v ",err)
+			if err != nil {
+				log.Printf("sdl-event-loop: %v ", err)
 				sdl.ClearError()
 			}
 		}
@@ -289,11 +286,14 @@ func updateSim(gridx int) {
 		runtime.Gosched()
 	}
 
+	numLines := len(lines)
 	for isRunning() {
 		for _, element := range lines {
 			pfparse([]byte(element))
 
 		}
+		atomic.AddInt64(&pixelXXCnt, int64(numLines))
+
 		time.Sleep(time.Duration(rand.Int63n(10)) * time.Millisecond) // some random delay
 	}
 	log.Printf("Exit updateSim %v", gridx)
@@ -315,9 +315,9 @@ func memProfileWriter() {
 }
 
 func checkSdlError() {
-	err:=sdl.GetError()
-	if err!=nil {
-		log.Printf("sdl: %v",err)
+	err := sdl.GetError()
+	if err != nil {
+		log.Printf("sdl: %v", err)
 		sdl.ClearError()
 	}
 }
@@ -337,12 +337,11 @@ func main() {
 		defer trace.Stop()
 	}
 
-	runtime.GOMAXPROCS(8+16 * runtime.NumCPU())
+	runtime.GOMAXPROCS(8 + 16*runtime.NumCPU())
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
 	sdl.ClearError()
-
 
 	flag.Parse()
 	if *cpuprofile != "" {
@@ -381,7 +380,7 @@ func main() {
 	go Server(serverQuit)
 
 	//simulated messages
-	if numSimUpdater>0 {
+	if numSimUpdater > 0 {
 		bdata, err := ioutil.ReadFile("test.pxfl")
 		checkError(err)
 		s := string(bdata)

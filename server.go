@@ -218,14 +218,31 @@ func acceptConns(srv *net.TCPListener) <-chan *net.TCPConn {
 	return conns
 }
 
+func findMyIp() string {
+	addrs, err := net.InterfaceAddrs()
+	addresses:=""
+
+
+	if err != nil {
+		panic(err)
+	}
+	for _, a := range addrs {
+		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback()  && !ipnet.IP.IsLinkLocalUnicast()  { // todo filter v6 temporary
+				addresses+=" "+ipnet.IP.String()
+		}
+	}
+	return addresses
+}
+
 func Server(quit chan int) { //todo add mechanism to terminate, channel?
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
 	hostname, _ := os.Hostname()
 	log.Printf("my hostname: %v", hostname)
-	addrs, _ := net.LookupHost(hostname)
-	log.Printf("my ips: %v", addrs)
+
+
+	log.Printf("my ips: %v", findMyIp())
 
 	service := ":" + port
 	tcpAddr, err := net.ResolveTCPAddr("tcp", service)
