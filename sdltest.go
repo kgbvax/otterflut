@@ -19,7 +19,7 @@ import (
 	"io/ioutil"
 	"strings"
 	"fmt"
-	"github.com/veandco/go-sdl2/gfx"
+	"github.com/veandco/go-sdl2/ttf"
 )
 
 type opix struct {
@@ -37,7 +37,7 @@ var H uint32 = 600
 var lines []string
 
 const numSimUpdater = 0
-const TargetFps = 30
+const TargetFps = 10
 const PerformTrace = false
 
 
@@ -51,6 +51,7 @@ var pixelsArr []byte
 var sdlTexture *sdl.Texture
 var renderer *sdl.Renderer
 var allDisplay *sdl.Rect
+var font *ttf.Font
 
 var xrunning = true
 var window *sdl.Window=nil
@@ -145,8 +146,8 @@ func updateWin() {
 	//renderer.Clear()
 	renderer.Copy(sdlTexture,allDisplay,allDisplay)
 
-	gfx.StringColor(renderer,0,16,statsMsg,sdl.Color{255,255,255,255})
-
+	//gfx.StringColor(renderer,0,16,statsMsg,sdl.Color{255,255,255,255})
+	font.RenderUTF8Solid(statsMsg,sdl.Color{255,255,255,255})
 	renderer.Present()
 
 	//window.UpdateSurface()
@@ -159,18 +160,23 @@ func windowInit() {
 	var err error
 
 	platform := sdl.GetPlatform()
-	log.Printf("platform: %v",platform)
-	switch platform {
-	case "Mac OS X":
-	    sdl.SetHint("SDL_HINT_FRAMEBUFFER_ACCELERATION", "metal")
-	    sdl.SetHint("SDL_HINT_RENDER_DRIVER", "metal") //this fails on older OSX versions, I don't care
+	workingDir,err:=os.Getwd()
 
+	log.Printf("platform: %v CWD:%v",platform,workingDir)
+	switch platform {
 	case "Linux":
 		//OpenGLES2
 		//sdl.GLSetAttribute(sdl.GL_CONTEXT_PROFILE_MASK,sdl.GL_CONTEXT_PROFILE_ES)
 		//sdl.GLSetAttribute(sdl.GL_CONTEXT_MAJOR_VERSION,2)
 		//sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION,0)
 	}
+
+
+	err=ttf.Init()
+	checkErr(err)
+
+	font,err=ttf.OpenFont("Inconsolata-Regular.ttf",16)
+	checkErr(err)
 
 
 	numModes,err:=sdl.GetNumDisplayModes(0)
@@ -197,7 +203,6 @@ func windowInit() {
 	}
 	checkSdlError()
 
-	//sdl.DisableScreenSaver()
 
 	//checkSdlError()
  	displayBounds,err := sdl.GetDisplayBounds(0)
@@ -239,6 +244,7 @@ func windowInit() {
 	pixelsArr = make ([]byte,W*H*4) //the actual pixel buffer hidden in a golang array
 	pixels=(*[]uint32)(unsafe.Pointer(&pixelsArr)) //wrangle into array of uint32
 
+	sdl.DisableScreenSaver()
 }
 
 func isRunning() bool {
