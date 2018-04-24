@@ -18,6 +18,8 @@ import (
 	"github.com/dustin/go-humanize"
 	"io/ioutil"
 	"strings"
+	"fmt"
+	"github.com/veandco/go-sdl2/gfx"
 )
 
 type opix struct {
@@ -35,7 +37,7 @@ var H uint32 = 600
 var lines []string
 
 const numSimUpdater = 0
-const TargetFps = 3
+const TargetFps = 30
 const PerformTrace = false
 
 
@@ -61,14 +63,17 @@ var outOfRangeErrorCnt int64
 var serverQuit = make(chan int)
 
 var globalWinUpdateLock = sync.Mutex{}
-
+var statsMsg =""
 
 func printFps() {
 	for isRunning() {
 		time.Sleep(time.Second * 1)
 		var sumPixelCount int64
 		sumPixelCount=atomic.LoadInt64(&pixelXXCnt)
-		log.Printf("errors (out of range:%v parse:%v) frames=%v msg: total=%v last=%v ", outOfRangeErrorCnt, errorCnt, atomic.LoadUint64(&frames),humanize.Comma(totalPixelCnt),humanize.Comma(sumPixelCount))
+
+		statsMsg := fmt.Sprintf("errors (out of range:%v parse:%v) frames=%v msg: total=%v last=%v ", outOfRangeErrorCnt, errorCnt, atomic.LoadUint64(&frames),humanize.Comma(totalPixelCnt),humanize.Comma(sumPixelCount))
+
+		log.Print(statsMsg)
 
 		totalPixelCnt+=sumPixelCount
 		atomic.StoreInt64(&pixelXXCnt,0)
@@ -137,8 +142,11 @@ func updateWin() {
 
 	sdlTexture.Update(allDisplay,pixelsArr,int(W*4))
 
-	renderer.Clear()
+	//renderer.Clear()
 	renderer.Copy(sdlTexture,allDisplay,allDisplay)
+
+	gfx.StringColor(renderer,0,16,statsMsg,sdl.Color{255,255,255,255})
+
 	renderer.Present()
 
 	//window.UpdateSurface()
@@ -166,18 +174,22 @@ func windowInit() {
 
 
 	numModes,err:=sdl.GetNumDisplayModes(0)
-	for i:=0; i<numModes; i++ {
+	for i:=0; i<=numModes; i++ {
 		mode,_:=sdl.GetDisplayMode(0,i)
 
 		log.Printf("mode %vx%v@%v f:%v",mode.W,mode.H,mode.RefreshRate,mode.Format)
 	}
 
+	rendererIndex:=-1
 	numdrv,err := sdl.GetNumRenderDrivers()
 	for i := 0; i < numdrv; i++ {
 		var rinfo sdl.RendererInfo
 		sdl.GetRenderDriverInfo(i, &rinfo)
-		name := rinfo.Name
-		log.Printf("available renderer driver: %v", name)
+		rendererName:=rinfo.Name
+		log.Printf("available renderer driver: #%v %v, flags:%b ",i, rendererName, rinfo.Flags)
+		if platform == "Mac OS X" && rendererName=="metal" {
+			rendererIndex=i
+		}
 	}
 
 	if err = sdl.Init(sdl.INIT_VIDEO); err != nil {
@@ -203,9 +215,10 @@ func windowInit() {
 
 
 	log.Print("create renderer")
-	renderer,err = sdl.CreateRenderer(window,-1,sdl.RENDERER_PRESENTVSYNC|sdl.RENDERER_ACCELERATED)
+	renderer,err = sdl.CreateRenderer(window,rendererIndex,sdl.RENDERER_PRESENTVSYNC|sdl.RENDERER_ACCELERATED)
 	checkErr(err)
 	checkSdlError()
+
 
 	info,err:=renderer.GetInfo()
 	log.Printf("selected renderer: %v",info.Name)

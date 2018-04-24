@@ -68,7 +68,8 @@ func parsUint(m []byte) uint32 {
 		return uint32(m[0] - '0')
 	}
 
-	panic("parsUint32 invalid length")
+	//panic("parsUint32 invalid length")
+	return 0
 }
 
 //Parse & performf a "PX" line

@@ -35,9 +35,10 @@ func checkErr(err error) {
 	}
 }
 
-func handlePolledEv(buffer []byte) {
+func handlePolledEv(conn *net.TCPConn) {
 	var messagesProcessedInChunk int64 = 0
-
+	buffer,_ :=ioutil.ReadAll(conn)
+//todo handle err
 	offset := 0
 	n := len(buffer)
 
@@ -55,37 +56,37 @@ func handlePolledEv(buffer []byte) {
 					messagesProcessedInChunk++
 
 				} else { // not a PX
-					/*	s_msg := string(msg)
-						s2 := strings.ToLower(s_msg)
-						if strings.Contains(s2, "size") {
-							_, err := conn.Write([]byte(fmt.Sprintf("SIZE %v %v\n", W, H)))
-							//TODO check err
-						}
-						if strings.Contains(s2, "help") {
-							hostname, _ := os.Hostname()
-							HELP := "OTTERFLUT (github.com/kgbvax/otterflut) on " + hostname + " (" + runtime.GOARCH + "/" + runtime.Version() +
-								")\nCommands:\n" +
-								"'PX x y rrggbb' set a pixel, where x,y = decimal postitive integer and colors are hex, hex values need leading zeros\n" +
-								"'HELP' - this text\n" +
-								"'SIZE' - get canvas size ,responds with 'SIZE X Y'\n" +
-								"\nReading pixels is not supported, alpha is not implemented yet\n"
-							_, err := conn.Write([]byte(HELP))
-							//TODO check err
-					*/
-				}
-			}
-			offset += nlAt + 1
-		} else { // nothing more
-			break
-		}
-	}
-	atomic.AddInt64(&pixelXXCnt, messagesProcessedInChunk)
+					s_msg := string(msg)
+					s2 := strings.ToLower(s_msg)
+					if strings.Contains(s2, "size") {
+						_, _ = conn.Write([]byte(fmt.Sprintf("SIZE %v %v\n", W, H)))
+						//TODO check err
+					}
+					if strings.Contains(s2, "help") {
+						hostname, _ := os.Hostname()
+						HELP := "OTTERFLUT (github.com/kgbvax/otterflut) on " + hostname + " (" + runtime.GOARCH + "/" + runtime.Version() +
+							")\nCommands:\n" +
+							"'PX x y rrggbb' set a pixel, where x,y = decimal postitive integer and colors are hex, hex values need leading zeros\n" +
+							"'HELP' - this text\n" +
+							"'SIZE' - get canvas size ,responds with 'SIZE X Y'\n" +
+							"\nReading pixels is not supported, alpha is not implemented yet\n"
+						_, _ = conn.Write([]byte(HELP))
+						//TODO check err
 
+					}
+				}
+				offset += nlAt + 1
+			} else { // nothing more
+				break
+			}
+		}
+		atomic.AddInt64(&pixelXXCnt, messagesProcessedInChunk)
+	}
 }
 
 // Handles incoming requests.
 // Handles closing of the connection.
-func handleConnection(conn *net.TCPConn) {
+func handleXXXConnection(conn *net.TCPConn) {
 	if lockThread {
 		runtime.LockOSThread()
 	} //uh oh, one thread per connection is not that great ;-)
@@ -192,15 +193,18 @@ func acceptConns(srv *net.TCPListener) <-chan *net.TCPConn {
 			// Get netpoll descriptor with EventRead|EventEdgeTriggered.
 			descriptor := netpoll.Must(netpoll.HandleRead(conn))
 
-			poller.Start(descriptor, func(ev netpoll.Event) {
-				if ev&netpoll.EventReadHup != 0 {
+			poller.Start(descriptor,
+				func(ev netpoll.Event) {
+				if ev & netpoll.EventReadHup != 0 {
 					poller.Stop(desc)
 					conn.Close()
 					return
 				}
 
-				buffer, err := ioutil.ReadAll(conn)
-				handlePolledEv(buffer)
+				//buffer, err := ioutil.ReadAll(conn)
+				//_=len(buffer)
+
+				handlePolledEv(conn)
 				if err != nil {
 					// handle error
 					log.Printf("err %v", err) //TODO "handle"
@@ -237,12 +241,12 @@ func Server(quit chan int) { //todo add mechanism to terminate, channel?
 	signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
 
 	// Receive new connections on an unbuffered channel.
-	conns := acceptConns(srv)
+	_ = acceptConns(srv)
 
 	for {
 		select {
-		case conn := <-conns:
-			go handleConnection(conn)
+		/*case conn := <-conns:
+			go handleConnection(conn) */
 
 		case <-quit:
 			log.Print("Server quit.")
