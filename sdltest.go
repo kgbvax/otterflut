@@ -2,23 +2,24 @@ package main
 
 import (
 	"flag"
-	"github.com/veandco/go-sdl2/sdl"
+	"fmt"
+	"io/ioutil"
 	"log"
+	"math/rand"
+	_ "net/http/pprof"
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"runtime/trace"
+	"strconv"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 	"unsafe"
-	"math/rand"
-	_ "net/http/pprof"
-	"strconv"
-	"sync"
-	"runtime/trace"
+
 	"github.com/dustin/go-humanize"
-	"io/ioutil"
-	"strings"
-	"fmt"
+	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 )
 
@@ -37,7 +38,7 @@ var H uint32 = 600
 var lines []string
 
 const numSimUpdater = 2
-const TargetFps = 10
+const TargetFps = 3.75
 const PerformTrace = false
 
 var pixelXXCnt int64
@@ -63,21 +64,26 @@ var serverQuit = make(chan int)
 
 var globalWinUpdateLock = sync.Mutex{}
 
+//status line related state
 var statsMsg = "Please stand by."
+var statusTextTexture *sdl.Texture
+var statusTextRect *sdl.Rect
 
-func printFps() {
+func updateStatsDisplay() {
 	for isRunning() {
 		time.Sleep(time.Second * 1)
 		var sumPixelCount int64
 		sumPixelCount = atomic.LoadInt64(&pixelXXCnt)
 
-		statsMsg = fmt.Sprintf("OTTERFLUT IP: %v, PORT:%v\nSTATS ERR:out-of-range:%v parse:%v FPS=%v MSG:total=%v last=%v ", findMyIp(),port,outOfRangeErrorCnt, errorCnt, atomic.LoadUint64(&frames), humanize.Comma(totalPixelCnt), humanize.Comma(sumPixelCount))
+		statsMsg = fmt.Sprintf("OTTERFLUT IP: %v, PORT:%v\nSTATS ERR:out-of-range:%v parse:%v FPS=%v MSG:total=%v last=%v ", findMyIp(), port, outOfRangeErrorCnt, errorCnt, atomic.LoadUint64(&frames), humanize.Comma(totalPixelCnt), humanize.Comma(sumPixelCount))
 
 		log.Print(statsMsg)
 
 		totalPixelCnt += sumPixelCount
 		atomic.StoreInt64(&pixelXXCnt, 0)
 		atomic.StoreUint64(&frames, 0)
+		statusTextTexture =nil //invalidate surface, needs to be re-generated
+
 	}
 }
 
@@ -85,6 +91,7 @@ func checkError(err error) {
 	if err != nil {
 		log.Fatal(err.Error())
 		os.Exit(1)
+
 	}
 }
 
@@ -130,13 +137,13 @@ func printSurfaceInfo(sur *sdl.Surface, name string) {
 }
 
 func updateWin() {
-	var solid *sdl.Surface
+
 	var err error
+
 	globalWinUpdateLock.Lock()
 	defer globalWinUpdateLock.Unlock()
 
-	frames++
-	//window.UpdateSurface()
+
 	sdlTexture.Unlock()
 	defer sdlTexture.Lock(allDisplay)
 
@@ -145,20 +152,22 @@ func updateWin() {
 
 	renderer.Copy(sdlTexture, allDisplay, allDisplay)
 
-	if solid, err = font.RenderUTF8BlendedWrapped(statsMsg, sdl.Color{255, 255, 0, 200},int(allDisplay.W)); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to render text: %s\n", err)
-		return
+	if statusTextTexture == nil {
+		var statusTextSurface *sdl.Surface
+		if statusTextSurface, err = font.RenderUTF8BlendedWrapped(statsMsg, sdl.Color{255, 255, 0, 200}, int(allDisplay.W)); err != nil {
+			log.Printf( "Failed to render text: %s\n", err)
+			return
+		}
+		defer statusTextSurface.Free()
+		statusTextRect = &sdl.Rect{0,0,statusTextSurface.W,statusTextSurface.H}
+		statusTextTexture, err = renderer.CreateTextureFromSurface(statusTextSurface)
+		checkErr(err)
 	}
-	defer solid.Free()
 
-	solidText, err := renderer.CreateTextureFromSurface(solid)
-	textBoundingBox := sdl.Rect{0, 0, solid.W, solid.H,}
-
-	checkErr(err)
-	renderer.Copy(solidText, &textBoundingBox, &sdl.Rect{20, 0, solid.W, solid.H})
+	renderer.Copy(statusTextTexture, statusTextRect ,statusTextRect)
 
 	renderer.Present()
-
+	frames++
 }
 
 func windowInit() {
@@ -168,13 +177,6 @@ func windowInit() {
 	workingDir, err := os.Getwd()
 
 	log.Printf("platform: %v CWD:%v", platform, workingDir)
-	switch platform {
-	case "Linux":
-		//OpenGLES2
-		//sdl.GLSetAttribute(sdl.GL_CONTEXT_PROFILE_MASK,sdl.GL_CONTEXT_PROFILE_ES)
-		//sdl.GLSetAttribute(sdl.GL_CONTEXT_MAJOR_VERSION,2)
-		//sdl.GLSetAttribute(sdl.GL_CONTEXT_MINOR_VERSION,0)
-	}
 
 	err = ttf.Init()
 	checkErr(err)
@@ -185,7 +187,6 @@ func windowInit() {
 	numModes, err := sdl.GetNumDisplayModes(0)
 	for i := 0; i <= numModes; i++ {
 		mode, _ := sdl.GetDisplayMode(0, i)
-
 		log.Printf("mode %vx%v@%v f:%v", mode.W, mode.H, mode.RefreshRate, mode.Format)
 	}
 
@@ -220,7 +221,7 @@ func windowInit() {
 		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_FULLSCREEN|sdl.WINDOW_OPENGL)
 
 	log.Print("create renderer")
-	renderer, err = sdl.CreateRenderer(window, rendererIndex, sdl.RENDERER_PRESENTVSYNC|sdl.RENDERER_ACCELERATED)
+	renderer, err = sdl.CreateRenderer(window, rendererIndex,  sdl.RENDERER_PRESENTVSYNC | sdl.RENDERER_ACCELERATED)
 	checkErr(err)
 	checkSdlError()
 
@@ -363,7 +364,7 @@ func main() {
 	}
 
 	windowInit()
-	go printFps()
+	go updateStatsDisplay()
 
 	ticker := time.NewTicker(1000 / TargetFps * time.Millisecond) //target 30fps
 	go func() {
