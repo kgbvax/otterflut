@@ -82,8 +82,11 @@ func updateStatsDisplay() {
 		totalPixelCnt += sumPixelCount
 		atomic.StoreInt64(&pixelXXCnt, 0)
 		atomic.StoreUint64(&frames, 0)
-		statusTextTexture =nil //invalidate surface, needs to be re-generated
 
+		if statusTextTexture != nil { //invalidate surface, needs to be re-generated
+			statusTextTexture.Destroy()
+			statusTextTexture =nil
+		}
 	}
 }
 
@@ -91,12 +94,10 @@ func checkError(err error) {
 	if err != nil {
 		log.Fatal(err.Error())
 		os.Exit(1)
-
 	}
 }
 
 func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
-
 	/*	//sdlcol:=sdl.Color{R: uint8((color & 0xff0000) >> 16),G: uint8((color & 0xff00) >> 8), B: uint8(color & 0xff), A: uint8((color&0xff000000)>>24) }
 		gfx.PixelRGBA(ren,int32(x),int32(y),255,255,0,255) */
 	offset := y*W + x
