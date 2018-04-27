@@ -65,7 +65,7 @@ var serverQuit = make(chan int)
 var globalWinUpdateLock = sync.Mutex{}
 
 //status line related state
-var statsMsg = "Please stand by."
+var statsMsg = "ಠ_ಠ Please stand by."
 var statusTextTexture *sdl.Texture
 var statusTextRect *sdl.Rect
 
