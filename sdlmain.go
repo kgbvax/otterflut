@@ -37,8 +37,8 @@ var H uint32 = 600
 
 var lines []string
 
-const numSimUpdater = 2
-const TargetFps = 3.75
+const numSimUpdater = 1
+const TargetFps = 15
 const PerformTrace = false
 
 var pixelXXCnt int64
@@ -198,8 +198,12 @@ func windowInit() {
 		sdl.GetRenderDriverInfo(i, &rinfo)
 		rendererName := rinfo.Name
 		log.Printf("available renderer driver: #%v %v, flags:%b ", i, rendererName, rinfo.Flags)
-		if platform == "Mac OS X" && rendererName == "metal" {
+		if platform == "Mac OS X" && rendererName == "metal" { //prefer Metal on Mac
 			rendererIndex = i
+			break
+		} else if platform =="Linux" && (runtime.GOARCH == "arm" || runtime.GOARCH=="arm64" ) && rendererName == "opengles2" { // prefer OpenGLES on ARM Linux since full OpenGL is often broken or software emulated
+			rendererIndex = i
+			break
 		}
 	}
 

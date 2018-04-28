@@ -64,11 +64,11 @@ func parsUint(m []byte) uint32 {
 		return uint32(
 			10*int(m[0]-'0') +
 				int(m[1]-'0'))
-	case 1:
+	case 1:  //least likely case
 		return uint32(m[0] - '0')
 	}
 
-	//panic("parsUint32 invalid length")
+	//todo increment error count
 	return 0
 }
 
