@@ -27,13 +27,14 @@ func parseHex4(m []byte) uint32 {
 
 //find next 'field' 'quickly' ;-)
 func nextNonWs(stri []byte, initialStart int) (int, int) {
-	i := initialStart
+
 	length := len(stri)
 	const SPACE byte = ' '
+	i:=initialStart
 
 	// Skip spaces in the front of the input.
-	for ; i < length && stri[i] == SPACE; i++ {
-	}
+	//for ; i < length && stri[i] == SPACE; i++ {
+	//}
 	start := i
 
 	// now find the end, ie the next space
