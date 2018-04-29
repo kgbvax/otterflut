@@ -38,7 +38,7 @@ var H uint32 = 600
 var lines []string
 
 const numSimUpdater = 1
-const targetFps = 7
+const targetFps = 15
 const performTrace = false
 
 var pixelXXCnt int64
@@ -68,6 +68,7 @@ var globalWinUpdateLock = sync.Mutex{}
 var statsMsg = "ಠ_ಠ Please stand by."
 var statusTextTexture *sdl.Texture
 var statusTextRect *sdl.Rect
+var useGLSwap=false
 
 func updateStatsDisplay() {
 	for isRunning() {
@@ -167,8 +168,13 @@ func updateWin() {
 
 	renderer.Copy(statusTextTexture, statusTextRect ,statusTextRect)
 
-	renderer.Present()
-	window.UpdateSurface()
+	if useGLSwap {
+		window.GLSwap()
+	} else {
+		renderer.Present()
+	}
+
+//	window.UpdateSurface()  //todo most likely not needed
 	frames++
 }
 
@@ -192,8 +198,9 @@ func windowInit() {
 		log.Printf("mode %vx%v@%v f:%v", mode.W, mode.H, mode.RefreshRate, mode.Format)
 	}
 
-	rendererIndex := -1
+	 rendererIndex := -1
 	numdrv, err := sdl.GetNumRenderDrivers()
+	checkErr(err)
 	for i := 0; i < numdrv; i++ {
 		var rinfo sdl.RendererInfo
 		sdl.GetRenderDriverInfo(i, &rinfo)
@@ -204,6 +211,7 @@ func windowInit() {
 			break
 		} else if platform =="Linux" && (runtime.GOARCH == "arm" || runtime.GOARCH=="arm64" ) && rendererName == "opengles2" { // prefer OpenGLES on ARM Linux since full OpenGL is often broken or software emulated
 			rendererIndex = i
+			useGLSwap=true
 			break
 		}
 	}
@@ -215,8 +223,8 @@ func windowInit() {
 
 	//checkSdlError()
 	displayBounds, err := sdl.GetDisplayBounds(0)
-
 	checkErr(err)
+
 	log.Printf("display: %vx%v", displayBounds.W, displayBounds.H)
 
 	W = uint32(displayBounds.W)
@@ -226,11 +234,14 @@ func windowInit() {
 		H: int32(H),
 	}
 
+	//window,renderer,err = sdl.CreateWindowAndRenderer(int32(W),int32(H),sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_FULLSCREEN|sdl.WINDOW_OPENGL)
 	window, err = sdl.CreateWindow("otterflut", 0, 0, int32(W), int32(H),
 		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_FULLSCREEN|sdl.WINDOW_OPENGL)
 
+	checkErr(err)
 	log.Print("create renderer")
 	renderer, err = sdl.CreateRenderer(window, rendererIndex,  sdl.RENDERER_PRESENTVSYNC | sdl.RENDERER_ACCELERATED)
+
 	checkErr(err)
 	checkSdlError()
 
