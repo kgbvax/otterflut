@@ -219,12 +219,12 @@ func windowInit() {
 			//prefer Metal on Mac
 			rendererIndex = i
 			break
-		} else if platform =="Linux" && (runtime.GOARCH == "arm" || runtime.GOARCH=="arm64" ) && rendererName == "opengles2" {
+		} /* else if platform =="Linux" && (runtime.GOARCH == "arm" || runtime.GOARCH=="arm64" ) && rendererName == "opengles2" {
 			// prefer OpenGLES on ARM Linux since full OpenGL is often broken or software emulated
 			rendererIndex = i
 			useGLSwap=true
 			break
-		}
+		} */
 	}
 
 	if err = sdl.Init(sdl.INIT_VIDEO); err != nil {
