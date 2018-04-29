@@ -38,8 +38,8 @@ var H uint32 = 600
 var lines []string
 
 const numSimUpdater = 1
-const TargetFps = 15
-const PerformTrace = false
+const targetFps = 7
+const performTrace = false
 
 var pixelXXCnt int64
 var totalPixelCnt int64
@@ -155,7 +155,7 @@ func updateWin() {
 
 	if statusTextTexture == nil {
 		var statusTextSurface *sdl.Surface
-		if statusTextSurface, err = font.RenderUTF8BlendedWrapped(statsMsg, sdl.Color{255, 255, 0, 200}, int(allDisplay.W)); err != nil {
+		if statusTextSurface, err = font.RenderUTF8BlendedWrapped(statsMsg, sdl.Color{R:200, G:255, B:0, A: 200}, int(allDisplay.W)); err != nil {
 			log.Printf( "Failed to render text: %s\n", err)
 			return
 		}
@@ -168,6 +168,7 @@ func updateWin() {
 	renderer.Copy(statusTextTexture, statusTextRect ,statusTextRect)
 
 	renderer.Present()
+	window.UpdateSurface()
 	frames++
 }
 
@@ -220,7 +221,10 @@ func windowInit() {
 
 	W = uint32(displayBounds.W)
 	H = uint32(displayBounds.H)
-	allDisplay = &sdl.Rect{0, 0, int32(W), int32(H)}
+	allDisplay = &sdl.Rect{
+		W: int32(W),
+		H: int32(H),
+	}
 
 	window, err = sdl.CreateWindow("otterflut", 0, 0, int32(W), int32(H),
 		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_FULLSCREEN|sdl.WINDOW_OPENGL)
@@ -329,7 +333,7 @@ func checkSdlError() {
 }
 
 func main() {
-	if PerformTrace {
+	if performTrace {
 		f, err := os.Create("trace.out")
 		if err != nil {
 			panic(err)
@@ -371,7 +375,7 @@ func main() {
 	windowInit()
 	go updateStatsDisplay()
 
-	ticker := time.NewTicker(1000 / TargetFps * time.Millisecond) //target 30fps
+	ticker := time.NewTicker(1000 / targetFps * time.Millisecond) //target 30fps
 	go func() {
 		for range ticker.C {
 			if isRunning() {
