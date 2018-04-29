@@ -13,7 +13,6 @@ import (
 	"os/signal"
 	"syscall"
 	"github.com/mailru/easygo/netpoll"
-	"io/ioutil"
 )
 
 var port = "1234"
@@ -35,12 +34,11 @@ func checkErr(err error) {
 	}
 }
 
-func handlePolledEv(conn *net.TCPConn) {
-	var messagesProcessedInChunk int64 = 0
-	buffer,_ :=ioutil.ReadAll(conn)
-//todo handle err
-	offset := 0
+func handleBuffer(buffer []byte, conn *net.TCPConn) {
+//	log.Printf("handle buffer")
 	n := len(buffer)
+	offset := 0
+	var messagesProcessedInChunk int64 = 0
 
 	for {
 		nlAt := bytes.IndexByte(buffer[offset:n], '\n')
@@ -79,8 +77,24 @@ func handlePolledEv(conn *net.TCPConn) {
 			} else { // nothing more
 				break
 			}
+		} else {
+			break
 		}
-		atomic.AddInt64(&pixelXXCnt, messagesProcessedInChunk)
+
+	}
+	atomic.AddInt64(&pixelXXCnt, messagesProcessedInChunk)
+}
+
+func handlePolledEv(conn *net.TCPConn) {
+	//log.Print("handle polled event")
+	//buffer,_ :=ioutil.ReadAll(conn)
+	var buffer = make([]byte, SOCKER_READ_CHUNK_SZ)
+	_, err := conn.Read(buffer)
+	if err == nil {
+		//log.Printf("read: %v", n)
+		handleBuffer(buffer, conn)
+	} else {
+		log.Printf("error reading %v", err)
 	}
 }
 
@@ -179,37 +193,39 @@ func acceptConns(srv *net.TCPListener) <-chan *net.TCPConn {
 				fmt.Fprintf(os.Stderr, "Error accepting connection: %v\n", err)
 				continue
 			}
-			conn.SetReadBuffer(SOCKET_READ_BUFFER_SZ)
-			conn.SetNoDelay(false)
+			//conn.SetReadBuffer(SOCKET_READ_BUFFER_SZ)
+			//conn.SetNoDelay(false)
 			desc, err := netpoll.Handle(conn, netpoll.EventRead|netpoll.EventEdgeTriggered)
 			if err != nil {
 				// handle error
+				log.Printf("poll error %v", err)
 			}
+
 			poller, err := netpoll.New(nil)
 			if err != nil {
 				// handle error
+				log.Printf("poll error %v", err)
 			}
 
-			// Get netpoll descriptor with EventRead|EventEdgeTriggered.
-			descriptor := netpoll.Must(netpoll.HandleRead(conn))
-
-			poller.Start(descriptor,
+			// Get netpoll descriptor with #|EventEdgeTriggered.
+			//descriptor := netpoll.Must(netpoll.HandleRead(conn))
+			log.Printf("poller start, %v", desc)
+			poller.Start(desc,
 				func(ev netpoll.Event) {
-				if ev & netpoll.EventReadHup != 0 {
-					poller.Stop(desc)
-					conn.Close()
-					return
-				}
+					if ev&netpoll.EventReadHup != 0 {
+						poller.Stop(desc)
+						conn.Close()
+						return
+					}
 
-				//buffer, err := ioutil.ReadAll(conn)
-				//_=len(buffer)
 
-				handlePolledEv(conn)
-				if err != nil {
-					// handle error
-					log.Printf("err %v", err) //TODO "handle"
-				}
-			})
+				   //	log.Printf("handle event %v", ev)
+					handlePolledEv(conn)
+					if err != nil {
+						// handle error
+						log.Printf("err %v", err) //TODO "handle"
+					}
+				})
 
 			conns <- conn
 		}
@@ -220,15 +236,14 @@ func acceptConns(srv *net.TCPListener) <-chan *net.TCPConn {
 
 func findMyIp() string {
 	addrs, err := net.InterfaceAddrs()
-	addresses:=""
-
+	addresses := ""
 
 	if err != nil {
 		panic(err)
 	}
 	for _, a := range addrs {
-		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback()  && !ipnet.IP.IsLinkLocalUnicast()  { // todo filter v6 temporary
-				addresses+=" "+ipnet.IP.String()
+		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && !ipnet.IP.IsLinkLocalUnicast() { // todo filter v6 temporary
+			addresses += " " + ipnet.IP.String()
 		}
 	}
 	return addresses
@@ -240,7 +255,6 @@ func Server(quit chan int) { //todo add mechanism to terminate, channel?
 
 	hostname, _ := os.Hostname()
 	log.Printf("my hostname: %v", hostname)
-
 
 	log.Printf("my ips: %v", findMyIp())
 

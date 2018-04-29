@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	_ "net/http/pprof"
 	"os"
 	"runtime"
@@ -21,6 +20,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
+	"math/rand"
 )
 
 type opix struct {
@@ -38,7 +38,7 @@ var H uint32 = 600
 var lines []string
 
 const numSimUpdater = 1
-const targetFps = 15
+const targetFps = 1
 const performTrace = false
 
 var pixelXXCnt int64
@@ -63,13 +63,14 @@ var outOfRangeErrorCnt int64
 var serverQuit = make(chan int)
 
 var globalWinUpdateLock = sync.Mutex{}
+var textTextureUpdateLock = sync.Mutex{}
 
 //status line related state
 var statsMsg = "ಠ_ಠ Please stand by."
 var statusTextTexture *sdl.Texture
 var statusTextRect *sdl.Rect
 var useGLSwap=false
-var lockTexture=true
+const lockTexture=true
 
 func updateStatsDisplay() {
 	for isRunning() {
@@ -85,10 +86,13 @@ func updateStatsDisplay() {
 		atomic.StoreInt64(&pixelXXCnt, 0)
 		atomic.StoreUint64(&frames, 0)
 
-		if statusTextTexture != nil { //invalidate surface, needs to be re-generated
-			statusTextTexture.Destroy()
-			statusTextTexture =nil
+	//	textTextureUpdateLock.Lock()
+		if statusTextTexture != nil { //invalidate surface, needs to be re-generated, todo race condition here, needs lock
+			x:=statusTextTexture
+			statusTextTexture=nil
+			x.Destroy()
 		}
+		//textTextureUpdateLock.Unlock()
 	}
 }
 
@@ -100,11 +104,10 @@ func checkError(err error) {
 }
 
 func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
-	/*	//sdlcol:=sdl.Color{R: uint8((color & 0xff0000) >> 16),G: uint8((color & 0xff00) >> 8), B: uint8(color & 0xff), A: uint8((color&0xff000000)>>24) }
-		gfx.PixelRGBA(ren,int32(x),int32(y),255,255,0,255) */
+
 	offset := y*W + x
 
-	if offset <= maxOffset { //out of bounds
+	if offset <= maxOffset { //not out of bounds
 		(*pixels)[offset] = color //uint32((color & 0xff0000) >> 16) | uint32((color & 0xff00) >> 8) | uint32(color & 0xff)
 
 	} else {
@@ -142,7 +145,7 @@ func printSurfaceInfo(sur *sdl.Surface, name string) {
 func updateWin() {
 
 	var err error
-
+	//log.Print("update")
 	globalWinUpdateLock.Lock()
 	defer globalWinUpdateLock.Unlock()
 
@@ -152,9 +155,13 @@ func updateWin() {
 	}
 
 	sdlTexture.Update(allDisplay, pixelsArr, int(W*4))
-	renderer.Clear()
+
+	renderer.Clear() //this is required, but frankly I don't understand why
 
 	renderer.Copy(sdlTexture, allDisplay, allDisplay)
+
+	textTextureUpdateLock.Lock()
+	defer textTextureUpdateLock.Unlock()
 
 	if statusTextTexture == nil {
 		var statusTextSurface *sdl.Surface
@@ -315,11 +322,11 @@ func updateSim(gridx int) {
 	for isRunning() {
 		for _, element := range lines {
 			pfparse([]byte(element))
+			time.Sleep(time.Duration(rand.Int63n(500)) * time.Nanosecond) // some random delay
 
 		}
 		atomic.AddInt64(&pixelXXCnt, int64(numLines))
 
-		time.Sleep(time.Duration(rand.Int63n(10)) * time.Millisecond) // some random delay
 	}
 	log.Printf("Exit updateSim %v", gridx)
 
