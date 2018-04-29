@@ -69,6 +69,7 @@ var statsMsg = "ಠ_ಠ Please stand by."
 var statusTextTexture *sdl.Texture
 var statusTextRect *sdl.Rect
 var useGLSwap=false
+var lockTexture=true
 
 func updateStatsDisplay() {
 	for isRunning() {
@@ -145,9 +146,10 @@ func updateWin() {
 	globalWinUpdateLock.Lock()
 	defer globalWinUpdateLock.Unlock()
 
-
-	sdlTexture.Unlock()
-	defer sdlTexture.Lock(allDisplay)
+	if lockTexture {
+		sdlTexture.Unlock()
+		defer sdlTexture.Lock(allDisplay)
+	}
 
 	sdlTexture.Update(allDisplay, pixelsArr, int(W*4))
 	renderer.Clear()
@@ -206,10 +208,12 @@ func windowInit() {
 		sdl.GetRenderDriverInfo(i, &rinfo)
 		rendererName := rinfo.Name
 		log.Printf("available renderer driver: #%v %v, flags:%b ", i, rendererName, rinfo.Flags)
-		if platform == "Mac OS X" && rendererName == "metal" { //prefer Metal on Mac
+		if platform == "Mac OS X" && rendererName == "metal" {
+			//prefer Metal on Mac
 			rendererIndex = i
 			break
-		} else if platform =="Linux" && (runtime.GOARCH == "arm" || runtime.GOARCH=="arm64" ) && rendererName == "opengles2" { // prefer OpenGLES on ARM Linux since full OpenGL is often broken or software emulated
+		} else if platform =="Linux" && (runtime.GOARCH == "arm" || runtime.GOARCH=="arm64" ) && rendererName == "opengles2" {
+			// prefer OpenGLES on ARM Linux since full OpenGL is often broken or software emulated
 			rendererIndex = i
 			useGLSwap=true
 			break
@@ -221,7 +225,6 @@ func windowInit() {
 	}
 	checkSdlError()
 
-	//checkSdlError()
 	displayBounds, err := sdl.GetDisplayBounds(0)
 	checkErr(err)
 
@@ -243,7 +246,6 @@ func windowInit() {
 	renderer, err = sdl.CreateRenderer(window, rendererIndex,  sdl.RENDERER_PRESENTVSYNC | sdl.RENDERER_ACCELERATED)
 
 	checkErr(err)
-	checkSdlError()
 
 	info, err := renderer.GetInfo()
 	log.Printf("selected renderer: %v", info.Name)
@@ -254,8 +256,10 @@ func windowInit() {
 		sdl.TEXTUREACCESS_STREAMING,
 		int32(W), int32(H))
 	checkErr(err)
-	checkSdlError()
-	//sdlTexture.Lock(nil)
+
+	if lockTexture {
+		sdlTexture.Lock(nil)
+	}
 
 	maxOffset = W * H
 
