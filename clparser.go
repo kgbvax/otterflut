@@ -1,6 +1,6 @@
 package main
 
-import "github.com/rainliu/gocl"
+import "github.com/rainliu/gocl/cl"
 
 const maxMsgLen = 32
 
