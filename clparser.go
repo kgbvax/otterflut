@@ -1,6 +1,6 @@
 package main
 
-import "otterflut/gocl/cl"
+import "github.com/rainliu/gocl"
 
 const maxMsgLen = 32
 

@@ -21,3 +21,6 @@ At Easterhegg18 we (again) has some fun with Pixelflut and I asked myself whethe
 Also @larsm laptop failed because of overheating (at 1GBit) at times. We also discussed ways to make pixelflut fast again and OpenGl was mentioned.
 My theory is that "settings pixels" by CPU would be the fastes way to do things since all GPU interaction requires simply a too many software layers.
 This is the proof-of-concept of this.
+
+# Install
+do 'go get -tags "cl12" github.com/rainliu/gocl/cl'
