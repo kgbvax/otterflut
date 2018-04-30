@@ -4,6 +4,10 @@ import (
 	"sync/atomic"
 )
 
+type parser interface {
+	 pfparse(m []byte)
+}
+
 //lookup table for hex digits
 var hexval32 = [256]uint32{'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5,
 	'6': 6, '7': 7, '8': 8, '9': 9, 'a': 0xA, 'A': 0xA, 'b': 0xB, 'B': 0xB, 'c': 0xC, 'C': 0xC, 'd': 0xD, 'D': 0xD,

@@ -26,6 +26,7 @@ const READ_PIXEL_B = 10
 const readChunkSize = SINGLE_PIXEL_LL * READ_PIXEL_B
 
 const lockThread = false
+const dontProcessPX =true  //for testing purposes
 
 // Or as a kind user on reddit refactored:
 func checkErr(err error) {
@@ -50,9 +51,10 @@ func handleBuffer(buffer []byte, conn *net.TCPConn) {
 			if len(msg) > 0 {
 
 				if msg[0] == 'P' {
-					pfparse(msg)
-					messagesProcessedInChunk++
-
+					if dontProcessPX {
+						pfparse(msg)
+						messagesProcessedInChunk++
+					}
 				} else { // not a PX
 					s_msg := string(msg)
 					s2 := strings.ToLower(s_msg)
