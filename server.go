@@ -19,6 +19,8 @@ import (
 var port = "1234"
 var connLimit = 1024
 var totalBytes int64
+var currentConnections
+
 
 const socketReadBufferSz = 256 * 1024
 const socketReadChunkSz = 16 * 1024 // keep in mind that we may need this for thousands of connections
@@ -163,6 +165,7 @@ func acceptConns(srv *net.TCPListener) <-chan *net.TCPConn {
 	go func() {
 		for isRunning() {
 			conn, err := srv.AcceptTCP()
+			currentConnections++
 
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error accepting connection: %v\n", err)
@@ -191,6 +194,7 @@ func acceptConns(srv *net.TCPListener) <-chan *net.TCPConn {
 						if ev&netpoll.EventReadHup != 0 {
 							poller.Stop(desc)
 							conn.Close()
+							currentConnections--
 							return
 						}
 

@@ -78,7 +78,7 @@ func updateStatsDisplay() {
 		var sumPixelCount int64
 		sumPixelCount = atomic.LoadInt64(&pixelXXCnt)
 
-		statsMsg = fmt.Sprintf("OTTERFLUT IP: %v, PORT:%v\nSTATS ERR:out-of-range:%v parse:%v FPS=%v MSG:total=%v last=%v ", findMyIp(), port, outOfRangeErrorCnt, errorCnt, atomic.LoadUint64(&frames), humanize.Comma(totalPixelCnt), humanize.Comma(sumPixelCount))
+		statsMsg = fmt.Sprintf("OTTERFLUT IP: %v, PORT:%v\nSTATS ERR:oor:%v parse:%v FPS:%v CONN:%v MSG:total=%v last=%v ", findMyIp(), port, outOfRangeErrorCnt, errorCnt, atomic.LoadUint64(&frames), currentConnections, humanize.Comma(totalPixelCnt), humanize.Comma(sumPixelCount))
 
 		log.Print(statsMsg)
 
