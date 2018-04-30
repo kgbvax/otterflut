@@ -13,7 +13,7 @@ import (
 	"os/signal"
 	"syscall"
 	"github.com/mailru/easygo/netpoll"
-	"bufio"
+	"sync"
 )
 
 var port = "1234"
@@ -36,6 +36,17 @@ func checkErr(err error) {
 	if err != nil {
 		log.Fatal("ERROR:", err)
 	}
+
+}
+
+
+var bufPool = sync.Pool{
+	New: func() interface{} {
+		// The Pool's New function should generally only return pointer
+		// types, since a pointer can be put into the return interface
+		// value without an allocation:
+		return make([]byte,socketReadChunkSz)
+	},
 }
 
 func handleBuffer(buffer []byte, conn *net.TCPConn) {
@@ -94,7 +105,9 @@ func handleBuffer(buffer []byte, conn *net.TCPConn) {
 
 func handlePolledEv(conn *net.TCPConn) {
 
-	var buffer = make([]byte, socketReadChunkSz)
+	//var buffer = make([]byte, socketReadChunkSz)
+	buffer  := bufPool.Get().([]byte)
+	defer bufPool.Put(buffer)
 	_, err := conn.Read(buffer)
 	if err == nil {
 		handleBuffer(buffer, conn)
@@ -122,12 +135,11 @@ func handleXXXConnection(conn *net.TCPConn) {
 		conn.Close()
 	}()
 
-	con2:=bufio.NewReaderSize(conn,socketReadChunkSz)
-	var buffer = make([]byte, socketReadChunkSz)
-
+	buffer  := bufPool.Get().([]byte)
+	defer bufPool.Put(buffer)
 	for { // forever: read from socket and process contents
 
-		_, err := con2.Read(buffer)
+		_, err := conn.Read(buffer)
 
 		//log.Printf("readn %v", n)
 		if err != nil {
@@ -140,6 +152,7 @@ func handleXXXConnection(conn *net.TCPConn) {
 			handleBuffer(buffer,conn)
 		}
 	}
+
 }
 
 // acceptConns uses the semaphore channel on the counter to rate limit.
