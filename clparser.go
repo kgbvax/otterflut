@@ -6,6 +6,8 @@ package main
 #cgo darwin LDFLAGS: -framework OpenC
 */
 
+import "gocl/cl"
+
 const maxMsgLen = 32
 
 func init() {
