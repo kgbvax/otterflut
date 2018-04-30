@@ -1,6 +1,10 @@
 package main
 
-import "github.com/rainliu/gocl/cl"
+/*
+#cgo CFLAGS: -I CL
+#cgo arm64  LDFLAGS: -lOpenCL -L/usr/lib/aarch64-linux-gnu
+#cgo darwin LDFLAGS: -framework OpenC
+*/
 
 const maxMsgLen = 32
 
