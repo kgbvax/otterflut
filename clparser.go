@@ -1,6 +1,6 @@
 package main
 
-import "gocl/cl"
+import "otterflut/gocl/cl"
 
 const maxMsgLen = 32
 
