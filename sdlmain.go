@@ -37,8 +37,8 @@ var H uint32 = 600
 
 var lines []string
 
-const numSimUpdater = 1
-const targetFps = 1
+const numSimUpdater = 0 //0=disable
+const targetFps = 0 //0=disable
 const performTrace = false
 
 var pixelXXCnt int64
@@ -397,17 +397,19 @@ func main() {
 	windowInit()
 	go updateStatsDisplay()
 
-	ticker := time.NewTicker(1000 / targetFps * time.Millisecond) //target 30fps
-	go func() {
-		for range ticker.C {
-			if isRunning() {
-				updateWin()
-			} else {
-				log.Print("Exit Window update ticker")
-				return //the end
+	if targetFps!=0  {
+		ticker := time.NewTicker(1000 / targetFps * time.Millisecond) //target 30fps
+		go func() {
+			for range ticker.C {
+				if isRunning() {
+					updateWin()
+				} else {
+					log.Print("Exit Window update ticker")
+					return //the end
+				}
 			}
-		}
-	}()
+		}()
+	}
 
 	go Server(serverQuit)
 
