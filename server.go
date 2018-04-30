@@ -126,7 +126,7 @@ func handleXXXConnection(conn *net.TCPConn) {
 
 	for { // forever: read from socket and process contents
 
-		n, err := conn.Read(buffer)
+		_, err := conn.Read(buffer)
 
 		//log.Printf("readn %v", n)
 		if err != nil {
