@@ -140,10 +140,7 @@ func handleXXXConnection(conn *net.TCPConn) {
 	buffer  := bufPool.Get().([]byte)
 	defer bufPool.Put(buffer)
 	for { // forever: read from socket and process contents
-
 		_, err := conn.Read(buffer)
-
-		//log.Printf("readn %v", n)
 		if err != nil {
 			//log.Printf("error reading: %v", err)
 			if err == io.EOF {
@@ -204,8 +201,6 @@ func acceptConns(srv *net.TCPListener) <-chan *net.TCPConn {
 							log.Printf("err %v", err) //TODO "handle"
 						}
 					})
-			} else {
-				go handleXXXConnection(conn)
 			}
 			conns <- conn
 		}
@@ -235,7 +230,6 @@ func Server(quit chan int) { //todo add mechanism to terminate, channel?
 
 	hostname, _ := os.Hostname()
 	log.Printf("my hostname: %v", hostname)
-
 	log.Printf("my ips: %v", findMyIp())
 
 	service := ":" + port
@@ -252,12 +246,14 @@ func Server(quit chan int) { //todo add mechanism to terminate, channel?
 	signal.Notify(sig, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
 
 	// Receive new connections on an unbuffered channel.
-	_ = acceptConns(srv)
+	conns := acceptConns(srv)
 
 	for {
 		select {
-		/*case conn := <-conns:
-			go handleConnection(conn) */
+		case conn := <-conns:
+			if !usePoll {
+				go handleXXXConnection(conn)
+			}
 
 		case <-quit:
 			log.Print("Server quit.")
