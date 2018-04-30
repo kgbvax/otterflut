@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"syscall"
 	"github.com/mailru/easygo/netpoll"
+	"bufio"
 )
 
 var port = "1234"
@@ -52,7 +53,6 @@ func handleBuffer(buffer []byte, conn *net.TCPConn) {
 
 			//log.Printf("process >>%v<<", string(msg))
 			if len(msg) > 0 {
-
 				if msg[0] == 'P' {
 					if processPX {
 						pfparse(msg)
@@ -122,11 +122,12 @@ func handleXXXConnection(conn *net.TCPConn) {
 		conn.Close()
 	}()
 
+	con2:=bufio.NewReaderSize(conn,socketReadChunkSz)
 	var buffer = make([]byte, socketReadChunkSz)
 
 	for { // forever: read from socket and process contents
 
-		_, err := conn.Read(buffer)
+		_, err := con2.Read(buffer)
 
 		//log.Printf("readn %v", n)
 		if err != nil {
