@@ -17,9 +17,10 @@ import (
 
 var port = "1234"
 var connLimit = 1024
+var totalBytes int64
 
 const SOCKET_READ_BUFFER_SZ = 1024 * 1024
-const SOCKER_READ_CHUNK_SZ = 512 * 1024 // keep in mind that we may need this for thousands of connections
+const socketReadChunkSz = 16 * 1024 // keep in mind that we may need this for thousands of connections
 
 const SINGLE_PIXEL_LL = 18 //PX nnn nnn rrggbb_
 const READ_PIXEL_B = 10
@@ -38,6 +39,7 @@ func checkErr(err error) {
 func handleBuffer(buffer []byte, conn *net.TCPConn) {
 //	log.Printf("handle buffer")
 	n := len(buffer)
+	totalBytes+=int64(n)
 	offset := 0
 	var messagesProcessedInChunk int64 = 0
 
@@ -88,12 +90,10 @@ func handleBuffer(buffer []byte, conn *net.TCPConn) {
 }
 
 func handlePolledEv(conn *net.TCPConn) {
-	//log.Print("handle polled event")
-	//buffer,_ :=ioutil.ReadAll(conn)
-	var buffer = make([]byte, SOCKER_READ_CHUNK_SZ)
+
+	var buffer = make([]byte, socketReadChunkSz)
 	_, err := conn.Read(buffer)
 	if err == nil {
-		//log.Printf("read: %v", n)
 		handleBuffer(buffer, conn)
 	} else {
 		log.Printf("error reading %v", err)
@@ -119,7 +119,7 @@ func handleXXXConnection(conn *net.TCPConn) {
 		conn.Close()
 	}()
 
-	var buffer = make([]byte, SOCKER_READ_CHUNK_SZ)
+	var buffer = make([]byte, socketReadChunkSz)
 
 	for { // forever: read from socket and process contents
 		var messagesProcessedInChunk int64
@@ -220,8 +220,6 @@ func acceptConns(srv *net.TCPListener) <-chan *net.TCPConn {
 						return
 					}
 
-
-				   //	log.Printf("handle event %v", ev)
 					handlePolledEv(conn)
 					if err != nil {
 						// handle error
