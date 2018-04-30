@@ -157,7 +157,7 @@ func handleXXXConnection(conn *net.TCPConn) {
 // acceptConns uses the semaphore channel on the counter to rate limit.
 // New connections get sent on the returned channel.
 func acceptConns(srv *net.TCPListener) <-chan *net.TCPConn {
-	conns := make(chan *net.TCPConn, 42)
+	conns := make(chan *net.TCPConn, 512)
 
 	go func() {
 		for isRunning() {
@@ -174,18 +174,18 @@ func acceptConns(srv *net.TCPListener) <-chan *net.TCPConn {
 				desc, err := netpoll.Handle(conn, netpoll.EventRead|netpoll.EventEdgeTriggered)
 				if err != nil {
 					// handle error
-					log.Printf("poll error %v", err)
+					log.Printf("poll error1 %v", err)
 				}
 
 				poller, err := netpoll.New(nil)
 				if err != nil {
 					// handle error
-					log.Printf("poll error %v", err)
+					log.Printf("poll error2 %v", err)
 				}
 
 				// Get netpoll descriptor with #|EventEdgeTriggered.
 				//descriptor := netpoll.Must(netpoll.HandleRead(conn))
-				log.Printf("poller start, %v", desc)
+				log.Printf("new cx", desc)
 				poller.Start(desc,
 					func(ev netpoll.Event) {
 						if ev&netpoll.EventReadHup != 0 {
