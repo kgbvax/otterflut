@@ -19,7 +19,7 @@ import (
 var port = "1234"
 var connLimit = 1024
 var totalBytes int64
-var currentConnections
+var currentConnections int
 
 
 const socketReadBufferSz = 256 * 1024
