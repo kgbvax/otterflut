@@ -27,7 +27,7 @@ const READ_PIXEL_B = 10
 const readChunkSize = SINGLE_PIXEL_LL * READ_PIXEL_B
 
 const lockThread = false
-const dontProcessPX =true  //for testing purposes
+const processPX =false //for testing purposes
 const usePoll=false
 
 // Or as a kind user on reddit refactored:
@@ -54,7 +54,7 @@ func handleBuffer(buffer []byte, conn *net.TCPConn) {
 			if len(msg) > 0 {
 
 				if msg[0] == 'P' {
-					if dontProcessPX {
+					if processPX {
 						pfparse(msg)
 					}
 					messagesProcessedInChunk++
