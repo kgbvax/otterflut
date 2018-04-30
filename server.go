@@ -28,8 +28,8 @@ const READ_PIXEL_B = 10
 const readChunkSize = SINGLE_PIXEL_LL * READ_PIXEL_B
 
 const lockThread = false
-const processPX =false //for testing purposes
-const usePoll=false
+const processPX =true // false for testing purposes
+const usePoll=true
 
 // Or as a kind user on reddit refactored:
 func checkErr(err error) {

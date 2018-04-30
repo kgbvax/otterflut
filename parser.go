@@ -37,8 +37,8 @@ func nextNonWs(stri []byte, initialStart int) (int, int) {
 	i:=initialStart
 
 	// Skip spaces in the front of the input.
-	//for ; i < length && stri[i] == SPACE; i++ {
-	//}
+	for ; i < length && stri[i] == SPACE; i++ {
+	}
 	start := i
 
 	// now find the end, ie the next space
@@ -82,13 +82,17 @@ func pfparse(m []byte) {
 
 	var color uint32
 
+
 	start, end := nextNonWs(m, 3)
 	x := parsUint(m[start:end])
+	//log.Printf("e1: %v %v %v",string(m[start:end]),start,end)
 
 	start, end = nextNonWs(m, end)
 	y := parsUint(m[start:end])
+	//log.Printf("e2: %v %v %v",string(m[start:end]),start,end)
 
 	start, end = nextNonWs(m, end)
+	//log.Printf("c: %v %v %v",string(m[start:end]),start,end)
 
 	hexstr := m[start:end]
 	switch len(hexstr) {
@@ -101,7 +105,7 @@ func pfparse(m []byte) {
 			if wrongLen <6 { //to short, could try to fix this by padding with leading 0s
 				//TODO maybe later or maybe never
 			}
-			//log.Printf("pfparse err >%v<",string(m))
+			//log.Printf("pfparse err >%v< >%v<",string(m),hexstr)
 			atomic.AddInt64(&errorCnt, 1)
 			return
 	}

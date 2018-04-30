@@ -38,7 +38,7 @@ var H uint32 = 600
 var lines []string
 
 const numSimUpdater = 0 //0=disable
-var targetFps time.Duration = 0 //0=disable
+var targetFps time.Duration = 5 //0=disable
 const performTrace = false
 
 var pixelXXCnt int64
