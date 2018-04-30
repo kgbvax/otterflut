@@ -56,8 +56,9 @@ func handleBuffer(buffer []byte, conn *net.TCPConn) {
 				if msg[0] == 'P' {
 					if dontProcessPX {
 						pfparse(msg)
-						messagesProcessedInChunk++
 					}
+					messagesProcessedInChunk++
+
 				} else { // not a PX
 					s_msg := string(msg)
 					s2 := strings.ToLower(s_msg)
@@ -88,6 +89,7 @@ func handleBuffer(buffer []byte, conn *net.TCPConn) {
 
 	}
 	atomic.AddInt64(&pixelXXCnt, messagesProcessedInChunk)
+
 }
 
 func handlePolledEv(conn *net.TCPConn) {
@@ -123,7 +125,6 @@ func handleXXXConnection(conn *net.TCPConn) {
 	var buffer = make([]byte, socketReadChunkSz)
 
 	for { // forever: read from socket and process contents
-		var messagesProcessedInChunk int64
 
 		n, err := conn.Read(buffer)
 
@@ -135,50 +136,7 @@ func handleXXXConnection(conn *net.TCPConn) {
 				return
 			}
 		} else {
-			offset := 0
-
-			for {
-				nlAt := bytes.IndexByte(buffer[offset:n], '\n')
-				if nlAt > 0 { // -1 not found and 0 (zero length) to be ignored
-					//log.Printf("offset: %v, nlAt:%v n:%v",offset,nlAt,n)
-					msg := buffer[offset : offset+nlAt] //without NL
-
-					//log.Printf("process >>%v<<", string(msg))
-					if len(msg) > 0 {
-
-						if msg[0] == 'P' {
-							pfparse(msg)
-							messagesProcessedInChunk++
-
-						} else { // not a PX
-							s_msg := string(msg)
-							s2 := strings.ToLower(s_msg)
-							if strings.Contains(s2, "size") {
-								_, err = conn.Write([]byte(fmt.Sprintf("SIZE %v %v\n", W, H)))
-								//TODO check err
-							}
-							if strings.Contains(s2, "help") {
-								hostname, _ := os.Hostname()
-								HELP := "OTTERFLUT (github.com/kgbvax/otterflut) on " + hostname + " (" + runtime.GOARCH + "/" + runtime.Version() +
-									")\nCommands:\n" +
-									"'PX x y rrggbb' set a pixel, where x,y = decimal postitive integer and colors are hex, hex values need leading zeros\n" +
-									"'HELP' - this text\n" +
-									"'SIZE' - get canvas size ,responds with 'SIZE X Y'\n" +
-									"\nReading pixels is not supported, alpha is not implemented yet\n"
-								_, err = conn.Write([]byte(HELP))
-								//TODO check err
-							}
-						}
-						offset += nlAt + 1
-					} else { // zero length msg
-						break
-					}
-				} else { //no NL found
-					break //TODO reshuffle buffer and continue to read MORE
-
-				}
-			}
-			atomic.AddInt64(&pixelXXCnt, messagesProcessedInChunk)
+			handleBuffer(buffer,conn)
 		}
 	}
 }
