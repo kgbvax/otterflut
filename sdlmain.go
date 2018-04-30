@@ -369,7 +369,7 @@ func main() {
 		defer trace.Stop()
 	}
 
-	runtime.GOMAXPROCS(8 + 16*runtime.NumCPU())
+	runtime.GOMAXPROCS(8 + runtime.NumCPU())
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
