@@ -19,7 +19,7 @@ var port = "1234"
 var connLimit = 1024
 var totalBytes int64
 
-const SOCKET_READ_BUFFER_SZ = 1024 * 1024
+const socketReadBufferSz = 256 * 1024
 const socketReadChunkSz = 16 * 1024 // keep in mind that we may need this for thousands of connections
 
 const SINGLE_PIXEL_LL = 18 //PX nnn nnn rrggbb_
@@ -196,7 +196,7 @@ func acceptConns(srv *net.TCPListener) <-chan *net.TCPConn {
 				fmt.Fprintf(os.Stderr, "Error accepting connection: %v\n", err)
 				continue
 			}
-			conn.SetReadBuffer(SOCKET_READ_BUFFER_SZ)
+			conn.SetReadBuffer(socketReadBufferSz)
 			conn.SetNoDelay(false)
 			if usePoll {
 				desc, err := netpoll.Handle(conn, netpoll.EventRead|netpoll.EventEdgeTriggered)
