@@ -28,6 +28,7 @@ const readChunkSize = SINGLE_PIXEL_LL * READ_PIXEL_B
 
 const lockThread = false
 const dontProcessPX =true  //for testing purposes
+const usePoll=false
 
 // Or as a kind user on reddit refactored:
 func checkErr(err error) {
@@ -195,38 +196,41 @@ func acceptConns(srv *net.TCPListener) <-chan *net.TCPConn {
 				fmt.Fprintf(os.Stderr, "Error accepting connection: %v\n", err)
 				continue
 			}
-			//conn.SetReadBuffer(SOCKET_READ_BUFFER_SZ)
-			//conn.SetNoDelay(false)
-			desc, err := netpoll.Handle(conn, netpoll.EventRead|netpoll.EventEdgeTriggered)
-			if err != nil {
-				// handle error
-				log.Printf("poll error %v", err)
+			conn.SetReadBuffer(SOCKET_READ_BUFFER_SZ)
+			conn.SetNoDelay(false)
+			if usePoll {
+				desc, err := netpoll.Handle(conn, netpoll.EventRead|netpoll.EventEdgeTriggered)
+				if err != nil {
+					// handle error
+					log.Printf("poll error %v", err)
+				}
+
+				poller, err := netpoll.New(nil)
+				if err != nil {
+					// handle error
+					log.Printf("poll error %v", err)
+				}
+
+				// Get netpoll descriptor with #|EventEdgeTriggered.
+				//descriptor := netpoll.Must(netpoll.HandleRead(conn))
+				log.Printf("poller start, %v", desc)
+				poller.Start(desc,
+					func(ev netpoll.Event) {
+						if ev&netpoll.EventReadHup != 0 {
+							poller.Stop(desc)
+							conn.Close()
+							return
+						}
+
+						handlePolledEv(conn)
+						if err != nil {
+							// handle error
+							log.Printf("err %v", err) //TODO "handle"
+						}
+					})
+			} else {
+				go handleXXXConnection(conn)
 			}
-
-			poller, err := netpoll.New(nil)
-			if err != nil {
-				// handle error
-				log.Printf("poll error %v", err)
-			}
-
-			// Get netpoll descriptor with #|EventEdgeTriggered.
-			//descriptor := netpoll.Must(netpoll.HandleRead(conn))
-			log.Printf("poller start, %v", desc)
-			poller.Start(desc,
-				func(ev netpoll.Event) {
-					if ev&netpoll.EventReadHup != 0 {
-						poller.Stop(desc)
-						conn.Close()
-						return
-					}
-
-					handlePolledEv(conn)
-					if err != nil {
-						// handle error
-						log.Printf("err %v", err) //TODO "handle"
-					}
-				})
-
 			conns <- conn
 		}
 	}()
