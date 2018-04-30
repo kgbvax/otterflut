@@ -1,3 +1,0 @@
-[submodule "vendor/github.com/rainliu/gocl"]
-	path = vendor/github.com/rainliu/gocl
-	url = https://github.com/rainliu/gocl.git
