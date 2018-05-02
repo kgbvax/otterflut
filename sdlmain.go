@@ -69,8 +69,9 @@ var textTextureUpdateLock = sync.Mutex{}
 var statsMsg = "ಠ_ಠ Please stand by."
 var statusTextTexture *sdl.Texture
 var statusTextRect *sdl.Rect
-var useGLSwap=false
 const lockTexture=false
+var glContext  sdl.GLContext
+
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
@@ -154,7 +155,7 @@ func updateWin() {
 	globalWinUpdateLock.Lock()
 	defer globalWinUpdateLock.Unlock()
 
-
+	window.GLMakeCurrent(glContext)
 	if lockTexture {
 		sdlTexture.Unlock()
 		if sdlErr:=sdl.GetError(); sdlErr!=nil {
@@ -229,22 +230,19 @@ func updateWin() {
 		sdl.ClearError()
 	}
 
-	if useGLSwap {
-		window.GLSwap()
-		if sdlErr:=sdl.GetError(); sdlErr!=nil {
-			log.Printf("sdl-err: %v",sdlErr)
-			sdl.ClearError()
-		}
-	} else {
+
+
+
 		renderer.Present()
 		if sdlErr:=sdl.GetError(); sdlErr!=nil {
 			log.Printf("sdl-err: %v",sdlErr)
 			sdl.ClearError()
 		}
-	}
 
-//	window.UpdateSurface()  //todo most likely not needed
-	frames++
+
+ window.UpdateSurface()  //todo most likely not needed
+
+ 	frames++
 }
 
 func windowInit() {
@@ -310,6 +308,9 @@ func windowInit() {
 
 	checkErr(err)
 
+	glContext,err=window.GLCreateContext()
+	checkErr(err)
+
 	log.Print("create renderer")
 	renderer, err = sdl.CreateRenderer(window, rendererIndex,  sdl.RENDERER_PRESENTVSYNC | sdl.RENDERER_ACCELERATED)
 
@@ -321,7 +322,7 @@ func windowInit() {
 
 	sdlTexture, err = renderer.CreateTexture(
 		sdl.PIXELFORMAT_ARGB8888,
-		sdl.TEXTUREACCESS_TARGET,
+		sdl.TEXTUREACCESS_STREAMING,
 		int32(W), int32(H))
 	checkErr(err)
 	if sdlErr:=sdl.GetError(); sdlErr!=nil {
