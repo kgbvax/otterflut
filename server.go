@@ -175,12 +175,14 @@ func acceptConns(srv *net.TCPListener) <-chan *net.TCPConn {
 				if err != nil {
 					// handle error
 					log.Printf("poll error1 %v", err)
+					break
 				}
 
 				poller, err := netpoll.New(nil)
 				if err != nil {
 					// handle error
 					log.Printf("poll error2 %v", err)
+					break
 				}
 
 				// Get netpoll descriptor with #|EventEdgeTriggered.

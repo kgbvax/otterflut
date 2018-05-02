@@ -38,7 +38,7 @@ var H uint32 = 600
 var lines []string
 
 const numSimUpdater = 0 //0=disable
-var targetFps time.Duration = 5 //0=disable
+var targetFps time.Duration = 30 //0=disable
 const performTrace = false
 
 var pixelXXCnt int64
@@ -70,7 +70,11 @@ var statsMsg = "ಠ_ಠ Please stand by."
 var statusTextTexture *sdl.Texture
 var statusTextRect *sdl.Rect
 var useGLSwap=false
-const lockTexture=true
+const lockTexture=false
+
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
 
 func updateStatsDisplay() {
 	for isRunning() {
@@ -102,6 +106,7 @@ func checkError(err error) {
 		os.Exit(1)
 	}
 }
+
 
 func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 
@@ -149,18 +154,39 @@ func updateWin() {
 	globalWinUpdateLock.Lock()
 	defer globalWinUpdateLock.Unlock()
 
+
 	if lockTexture {
 		sdlTexture.Unlock()
+		if sdlErr:=sdl.GetError(); sdlErr!=nil {
+			log.Printf("sdl-err: %v",sdlErr)
+			sdl.ClearError()
+		}
 		defer sdlTexture.Lock(allDisplay)
 	}
 
 	sdlTexture.Update(allDisplay, pixelsArr, int(W*4))
+	if sdlErr:=sdl.GetError(); sdlErr!=nil {
+		log.Printf("sdl-err: %v",sdlErr)
+		sdl.ClearError()
+	}
 
 	renderer.Clear() //this is required, but frankly I don't understand why
+	if sdlErr:=sdl.GetError(); sdlErr!=nil {
+		log.Printf("sdl-err: %v",sdlErr)
+		sdl.ClearError()
+	}
 
 	renderer.Copy(sdlTexture, allDisplay, allDisplay)
+	if sdlErr:=sdl.GetError(); sdlErr!=nil {
+		log.Printf("sdl-err: %v",sdlErr)
+		sdl.ClearError()
+	}
 
 	textTextureUpdateLock.Lock()
+	if sdlErr:=sdl.GetError(); sdlErr!=nil {
+		log.Printf("sdl-err: %v",sdlErr)
+		sdl.ClearError()
+	}
 	defer textTextureUpdateLock.Unlock()
 
 	if statusTextTexture == nil {
@@ -169,18 +195,52 @@ func updateWin() {
 			log.Printf( "Failed to render text: %s\n", err)
 			return
 		}
+
+		if sdlErr:=sdl.GetError(); sdlErr!=nil {
+			log.Printf("sdl-err: %v",sdlErr)
+			sdl.ClearError()
+		}
+
+		statusTextSurface.SetColorKey(true,0)
+		if sdlErr:=sdl.GetError(); sdlErr!=nil {
+			log.Printf("sdl-err: %v",sdlErr)
+			sdl.ClearError()
+		}
+
+
+
 		defer statusTextSurface.Free()
 		statusTextRect = &sdl.Rect{0,0,statusTextSurface.W,statusTextSurface.H}
+		if sdlErr:=sdl.GetError(); sdlErr!=nil {
+			log.Printf("sdl-err: %v",sdlErr)
+			sdl.ClearError()
+		}
 		statusTextTexture, err = renderer.CreateTextureFromSurface(statusTextSurface)
+		if sdlErr:=sdl.GetError(); sdlErr!=nil {
+			log.Printf("sdl-err: %v",sdlErr)
+			sdl.ClearError()
+		}
 		checkErr(err)
 	}
 
 	renderer.Copy(statusTextTexture, statusTextRect ,statusTextRect)
+	if sdlErr:=sdl.GetError(); sdlErr!=nil {
+		log.Printf("sdl-err: %v",sdlErr)
+		sdl.ClearError()
+	}
 
 	if useGLSwap {
 		window.GLSwap()
+		if sdlErr:=sdl.GetError(); sdlErr!=nil {
+			log.Printf("sdl-err: %v",sdlErr)
+			sdl.ClearError()
+		}
 	} else {
 		renderer.Present()
+		if sdlErr:=sdl.GetError(); sdlErr!=nil {
+			log.Printf("sdl-err: %v",sdlErr)
+			sdl.ClearError()
+		}
 	}
 
 //	window.UpdateSurface()  //todo most likely not needed
@@ -217,8 +277,8 @@ func windowInit() {
 		log.Printf("available renderer driver: #%v %v, flags:%b ", i, rendererName, rinfo.Flags)
 		if platform == "Mac OS X" && rendererName == "metal" {
 			//prefer Metal on Mac
-			rendererIndex = i
-			break
+		//	rendererIndex = i
+		//	break
 		} /* else if platform =="Linux" && (runtime.GOARCH == "arm" || runtime.GOARCH=="arm64" ) && rendererName == "opengles2" {
 			// prefer OpenGLES on ARM Linux since full OpenGL is often broken or software emulated
 			rendererIndex = i
@@ -230,7 +290,7 @@ func windowInit() {
 	if err = sdl.Init(sdl.INIT_VIDEO); err != nil {
 		panic(err)
 	}
-	checkSdlError()
+
 
 	displayBounds, err := sdl.GetDisplayBounds(0)
 	checkErr(err)
@@ -246,9 +306,10 @@ func windowInit() {
 
 	//window,renderer,err = sdl.CreateWindowAndRenderer(int32(W),int32(H),sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_FULLSCREEN|sdl.WINDOW_OPENGL)
 	window, err = sdl.CreateWindow("otterflut", 0, 0, int32(W), int32(H),
-		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI|sdl.WINDOW_FULLSCREEN|sdl.WINDOW_OPENGL)
+		sdl.WINDOW_SHOWN|sdl.WINDOW_ALLOW_HIGHDPI/*|sdl.WINDOW_FULLSCREEN*/)
 
 	checkErr(err)
+
 	log.Print("create renderer")
 	renderer, err = sdl.CreateRenderer(window, rendererIndex,  sdl.RENDERER_PRESENTVSYNC | sdl.RENDERER_ACCELERATED)
 
@@ -260,12 +321,21 @@ func windowInit() {
 
 	sdlTexture, err = renderer.CreateTexture(
 		sdl.PIXELFORMAT_ARGB8888,
-		sdl.TEXTUREACCESS_STREAMING,
+		sdl.TEXTUREACCESS_TARGET,
 		int32(W), int32(H))
 	checkErr(err)
+	if sdlErr:=sdl.GetError(); sdlErr!=nil {
+		log.Printf("sdl-err: %v", sdlErr)
+		sdl.ClearError()
+	}
+
 
 	if lockTexture {
 		sdlTexture.Lock(nil)
+		if sdlErr:=sdl.GetError(); sdlErr!=nil {
+			log.Printf("initial-texture-lock: %v",sdlErr)
+			sdl.ClearError()
+		}
 	}
 
 	maxOffset = W * H
@@ -274,6 +344,10 @@ func windowInit() {
 	pixels = (*[]uint32)(unsafe.Pointer(&pixelsArr)) //wrangle into array of uint32
 
 	sdl.DisableScreenSaver()
+	if sdlErr:=sdl.GetError(); sdlErr!=nil {
+		log.Printf("sdl-err: %v",sdlErr)
+		sdl.ClearError()
+	}
 }
 
 func isRunning() bool {
@@ -304,7 +378,6 @@ func sdlEventLoop() {
 			}
 		} else {
 			err := sdl.GetError()
-
 			if err != nil {
 				log.Printf("sdl-event-loop: %v ", err)
 				sdl.ClearError()
@@ -343,14 +416,6 @@ func memProfileWriter() {
 		}
 		pprof.WriteHeapProfile(f)
 		f.Close()
-	}
-}
-
-func checkSdlError() {
-	err := sdl.GetError()
-	if err != nil {
-		log.Printf("sdl: %v", err)
-		sdl.ClearError()
 	}
 }
 
