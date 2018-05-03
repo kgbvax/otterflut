@@ -14,10 +14,22 @@ var hexval32 = [256]uint32{'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5,
 	'e': 0xE, 'E': 0xE, 'f': 0xF, 'F': 0xF}
 
 //quickly  parse a 3 byte hex number
+/*
 func parseHex3(m []byte) uint32 {
 	//MUL version, compiles to shifts
 	return 0x100000*hexval32[m[0]] + 0x010000*hexval32[m[1]] + 0x001000*hexval32[m[2]] +
 		0x000100*hexval32[m[3]] + 0x000010*hexval32[m[4]] + hexval32[m[5]]
+} */
+
+//quickly  parse a 3 byte hex number
+//RGB to BGR included
+
+func parseHex3ToBGR(m []byte) uint32 {
+	//MUL version, compiles to shifts
+	// BB GG RR
+	return 0x100000*hexval32[m[4]] + 0x010000*hexval32[m[5]] +
+		0x001000*hexval32[m[2]] + 0x000100*hexval32[m[3]] +
+		0x000010*hexval32[m[0]] + hexval32[m[1]]
 }
 
 //quickly parse a 4 byte hex number
@@ -97,7 +109,7 @@ func pfparse(m []byte) {
 	hexstr := m[start:end]
 	switch len(hexstr) {
 		case 6:
-			color = parseHex3(hexstr)
+			color = parseHex3ToBGR(hexstr)
 		case 8:
 			color = parseHex4(hexstr)
 		default:
