@@ -1,6 +1,6 @@
 //
 // +build darwin linux windows
-// +build amd64 386
+// +build amd64 386 arm
 //
 // ^^  assume that these platforms provide full OpenGL support
 
