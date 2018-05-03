@@ -66,10 +66,10 @@ func ofGlPollEvents() {
 	glfw.PollEvents()
 }
 
-func makeTexture(texture uint32) uint32 {
-	if texture!=0 {
-		gl.DeleteTextures(1,&texture)
-	}
+func makeTexture()  {
+
+	gl.DeleteTextures(1,&texture)
+
 
 	gl.GenTextures(1, &texture)
 	gl.BindTexture(gl.TEXTURE_2D, texture)
@@ -88,8 +88,6 @@ func makeTexture(texture uint32) uint32 {
 		gl.UNSIGNED_BYTE,
 		gl.Ptr(*pixels))
 
-
-	return texture
 }
 
 func setupScene() {
@@ -122,7 +120,7 @@ func drawScene() {
 	gl.Translatef(0, 0, -0.0000001) //I have no idea what I am doing ;-)
 	gl.Rotatef(0, 0, 0, 0)
 
-	 texture = makeTexture(texture)
+	makeTexture()
 
 	gl.BindTexture(gl.TEXTURE_2D, texture)
 	gl.Color4f(1, 1, 1, 1)
