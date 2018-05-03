@@ -1,7 +1,8 @@
 //
-// +build darwin linux
+// +build darwin linux windows
 // +build amd64 386
 //
+// ^^  assume that these platforms provide full OpenGL support
 
 package main
 
