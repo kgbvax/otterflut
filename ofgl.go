@@ -15,7 +15,10 @@ import (
 )
 
 
-var window *glfw.Window
+var (
+	texture uint32
+	window *glfw.Window
+	)
 
 func initGl() {
 	var err error
@@ -48,6 +51,7 @@ func initGl() {
 		panic(err)
 	}
 
+	gl.Enable(gl.TEXTURE_2D)
 }
 
 func ofGlShouldClose() bool {
@@ -62,9 +66,11 @@ func ofGlPollEvents() {
 	glfw.PollEvents()
 }
 
-func makeTexture() uint32 {
-	var texture uint32
-	gl.Enable(gl.TEXTURE_2D)
+func makeTexture(texture uint32) uint32 {
+	if texture!=0 {
+		gl.DeleteTextures(1,&texture)
+	}
+
 	gl.GenTextures(1, &texture)
 	gl.BindTexture(gl.TEXTURE_2D, texture)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
@@ -116,7 +122,7 @@ func drawScene() {
 	gl.Translatef(0, 0, -0.0000001) //I have no idea what I am doing ;-)
 	gl.Rotatef(0, 0, 0, 0)
 
-	var texture = makeTexture()
+	 texture = makeTexture(texture)
 
 	gl.BindTexture(gl.TEXTURE_2D, texture)
 	gl.Color4f(1, 1, 1, 1)

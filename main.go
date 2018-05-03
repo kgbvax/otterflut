@@ -44,7 +44,6 @@ var serverQuit = make(chan int)
 //status line related state
 var statsMsg = "ಠ_ಠ Please stand by."
 
-var texture uint32
 
 func init() {
 	runtime.LockOSThread()
@@ -119,7 +118,7 @@ func updateSim(gridx int) {
 	for isRunning() {
 		for _, element := range lines {
 			pfparse([]byte(element))
-			time.Sleep(time.Duration(rand.Int63n(500)) * time.Nanosecond) // some random delay
+			time.Sleep(time.Duration(rand.Int63n(1000)) * time.Nanosecond) // some random delay
 
 		}
 		atomic.AddInt64(&pixelXXCnt, int64(numLines))
