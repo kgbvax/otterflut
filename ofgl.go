@@ -1,3 +1,8 @@
+//
+// +build darwin linux
+// +build amd64 386
+//
+
 package main
 
 import (
@@ -8,9 +13,6 @@ import (
 	"github.com/go-gl/gl/v3.2-compatibility/gl"
 )
 
-//
-// +build
-//
 
 var window *glfw.Window
 
