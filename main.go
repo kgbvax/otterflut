@@ -14,18 +14,19 @@ import (
 	"sync/atomic"
 	"time"
 	"github.com/dustin/go-humanize"
-	"math/rand"
 	"unsafe"
+	"math/rand"
 )
 
-//uint to save on sign manipulation in hot loop
-var W uint32 = 800
-var H uint32 = 600
+//uint32 to save on sign manipulation in hot loop
+var W uint32
+var H uint32
 
+//only used if simulation is active
 var lines []string
 
 const numSimUpdater = 1          //0=disable
-var targetFps time.Duration = 30 //0=disable
+var targetFps time.Duration = 15 //0=disable
 const performTrace = false
 
 var pixelXXCnt int64
@@ -35,6 +36,7 @@ var pixels *[]uint32
 
 var xrunning = true
 
+//statisitcs counters
 var frames uint64
 var errorCnt int64
 var outOfRangeErrorCnt int64
@@ -44,11 +46,6 @@ var serverQuit = make(chan int)
 //status line related state
 var statsMsg = "ಠ_ಠ Please stand by."
 
-
-func init() {
-	runtime.LockOSThread()
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-}
 
 func updateStatsDisplay() {
 	for isRunning() {
@@ -74,20 +71,15 @@ func checkError(err error) {
 	}
 }
 
+//no bounds check on x and y!
+//color is whatever the underyling texture uses (BGR)
 func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
 
 	offset := y*W + x
+	offset2 := (W*H - offset)-1
 
-	if x < W && y < H { //not out of bounds
-		//	log.Printf("set pixel at %v %v %v",offset,x,y)
+	(*pixels)[offset2] = color
 
-		(*pixels)[offset] = color //uint32((color & 0xff0000) >> 16) | uint32((color & 0xff00) >> 8) | uint32(color & 0xff)
-
-	} else {
-		//log.Printf("pixel out of range %v %v ",x,y)
-		atomic.AddInt64(&outOfRangeErrorCnt, 1)
-		return // ignore
-	}
 }
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
@@ -118,14 +110,12 @@ func updateSim(gridx int) {
 	for isRunning() {
 		for _, element := range lines {
 			pfparse([]byte(element))
-			time.Sleep(time.Duration(rand.Int63n(1000)) * time.Nanosecond) // some random delay
+			time.Sleep(time.Duration(rand.Int63n(100)) * time.Nanosecond) // some random delay
 
 		}
 		atomic.AddInt64(&pixelXXCnt, int64(numLines))
-
 	}
 	log.Printf("Exit updateSim %v", gridx)
-
 }
 
 //take 10 memory profiles every 5 seconds
@@ -145,28 +135,28 @@ func memProfileWriter() {
 func main() {
 	runtime.GOMAXPROCS(8 + runtime.NumCPU())
 
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	flag.Parse()
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
-
 		if err != nil {
 			log.Fatal("could not create CPU profile: ", err)
 		}
-
-		runtime.SetCPUProfileRate(200)
+		//runtime.SetCPUProfileRate(200)
 		if err := pprof.StartCPUProfile(f); err != nil {
 			log.Fatal("could not start CPU profile: ", err)
 		}
-
 		defer pprof.StopCPUProfile()
 	}
 	if *memprofile != "" {
 		go memProfileWriter()
 	}
 
+	runtime.LockOSThread()  //OpenGL does not like being called from multiple threads
 	initGl()
 
-	buf := createImageBuffer(int(W), int(H))
+	buf :=  make([]uint32, W*H)
 	pixels = (*[]uint32)(unsafe.Pointer(&buf)) //wrangle into array of uint32
 
 	setupScene()
@@ -188,27 +178,23 @@ func main() {
 	//start the TCP server
 	go Server(serverQuit)
 
+	//main event loop
 	if targetFps != 0 {
 		ticker := time.NewTicker(1000 / targetFps * time.Millisecond) //target 30fps
 		func() {
 			for range ticker.C { //main event loop
 				if !ofGlShouldClose() {
-
 					drawScene()
-					frames++
 					ofGlSwapBuffer()
 					ofGlPollEvents()
+					frames++
 				} else {
+					stopRunning()
 					log.Print("Exit Window update ticker")
 					return //the boom! //todo needs proper cleanup
 				}
 			}
 		}()
 	}
-
-}
-
-func createImageBuffer(width int, height int) []uint32 {
-	buffer := make([]uint32, W*H)
-	return buffer
+	//cleanup
 }

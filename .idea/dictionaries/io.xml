@@ -2,7 +2,10 @@
   <dictionary name="io">
     <words>
       <w>cflags</w>
+      <w>cpuprofile</w>
       <w>hexval</w>
+      <w>memprofile</w>
+      <w>tracecall</w>
     </words>
   </dictionary>
 </component>

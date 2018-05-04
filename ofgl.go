@@ -8,8 +8,6 @@ package main
 
 import (
 	"log"
-	"runtime"
-	"strings"
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/gl/v3.2-compatibility/gl"
 )
@@ -28,17 +26,10 @@ func initGl() {
 	}
 
 
-	if runtime.GOOS == "linux" && strings.Contains(runtime.GOARCH, "arm") {
-
-	} else {
-		glfw.WindowHint(glfw.ContextVersionMajor, 2)
-		glfw.WindowHint(glfw.ContextVersionMinor, 1)
-
-	}
 	monitor := glfw.GetPrimaryMonitor()
 
-	W = uint32(monitor.GetVideoMode().Width) / 2
-	H = uint32(monitor.GetVideoMode().Height) / 2
+	W = uint32(monitor.GetVideoMode().Width)
+	H = uint32(monitor.GetVideoMode().Height)
 
 	log.Printf("monitor '%v' %v x %v", monitor.GetName(), W, H)
 	window, err = glfw.CreateWindow(int(W), int(H), "Otterflut", nil, nil)

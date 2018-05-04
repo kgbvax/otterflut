@@ -4,9 +4,13 @@ import (
 	"sync/atomic"
 )
 
-type parser interface {
-	 pfparse(m []byte)
+
+
+type ofState  struct {
+	W uint32
+	H uint32
 }
+
 
 //lookup table for hex digits
 var hexval32 = [256]uint32{'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5,
@@ -99,9 +103,19 @@ func pfparse(m []byte) {
 	x := parsUint(m[start:end])
 	//log.Printf("e1: %v %v %v",string(m[start:end]),start,end)
 
+	if x >= W { //out of bounds, abort now
+		atomic.AddInt64(&outOfRangeErrorCnt, 1)
+		return // ignore
+	}
+
 	start, end = nextNonWs(m, end)
 	y := parsUint(m[start:end])
 	//log.Printf("e2: %v %v %v",string(m[start:end]),start,end)
+
+	if y >= H { //out of bounds, abort now
+		atomic.AddInt64(&outOfRangeErrorCnt, 1)
+		return // ignore
+	}
 
 	start, end = nextNonWs(m, end)
 	//log.Printf("c: %v %v %v",string(m[start:end]),start,end)
