@@ -6,57 +6,175 @@ package main
 // #cgo darwin LDFLAGS: -framework OpenCL
 //
 
+/*
+ * WARNING: This will fail if endianness of host and GPU do not match.
+ * Mea culpa
+ */
+
 import (
 	"gocl/cl"
 	"unsafe"
 	"gocl/cl_demo/utils"
 	"log"
-	"time"
-	"github.com/dustin/go-humanize"
+	"sync"
 )
 
-const pxMsgLen = 32
-const batchSize = cl.CL_size_t(500000)
-const numIter = 1000
+var testMsg [22]byte
 
-var testMsg [32]cl.CL_char
+const (
+	pxMsgLen = 22  //the maximum size of "PX" message we are willing to handle
+	//batchSize = cl.CL_size_t(524288) // number of PX messages we submit to the kernel in one go
+	batchSize = cl.CL_size_t(524288)
+	lenUint16 = 2 //OpenCL ushort
+	lenUint32 = 4 //OpenCL uint
+	numIter   = 500 // only for testing
+
+	datasizeA  = cl.CL_size_t(pxMsgLen * batchSize) //number of bytes in the A input array (PX msg)
+	datasizeXY = cl.CL_size_t(batchSize * lenUint16) //number of bytes in the X/Y output
+	datasizeC  = cl.CL_size_t(batchSize * lenUint32) //number of bytes in the color output
+)
 
 func initTestMsg() {
-	//xxxxxxxxxxx0123456789012345678
-	const msg = "PX 1 2 ABCDEF"
+	//xxxxxxxxxxx0123456789012345678901
+	const msg = "PX 255 1337 ABCDEF"
+	//const msg2 ="PX 1111 1111 AABBCCDD"
 	for k, v := range msg {
-		testMsg[k] = cl.CL_char(v)
+		testMsg[k] = byte(v)
 	}
 }
 
-func clinit() {
-	initTestMsg()
+type pxBufT *[batchSize * pxMsgLen]byte
+type coordBufT *[batchSize]uint16
+type colBufT *[batchSize]uint32
+type pixelBufT* [1920*1080]uint32
 
-	var A [pxMsgLen * batchSize]cl.CL_char //input array
-	var X [batchSize]uint16                //output ushort[]
-	var Y [batchSize]uint16                //output ushort[]
-	var C [batchSize]uint32                //output uint
+type oclParam struct {
+	currentOffset	int
+	A        pxBufT    //input array
+	X        coordBufT //output ushort[]
+	Y        coordBufT //output ushort[]
+	C        colBufT   //output uint
+	PXM      pixelBufT //output pixmap
+	bufferA  cl.CL_mem
+	bufferX  cl.CL_mem
+	bufferY  cl.CL_mem
+	bufferC  cl.CL_mem
+	bufferPXM cl.CL_mem
+	context  cl.CL_context
+	kernel   cl.CL_kernel
+	cmdQueue cl.CL_command_queue
+	program  *cl.CL_program
 
-	datasizeA := cl.CL_size_t(unsafe.Sizeof(A))
-	datasizeXY := cl.CL_size_t(unsafe.Sizeof(X))
-	datasizeC := cl.CL_size_t(unsafe.Sizeof(C))
+}
 
-	// Allocate space for input/output data
-	//A = make([][pxMsgLen]cl.CL_char, batchSize)
-	//X = make([]cl.CL_int, batchSize)
-	//Y = make([]cl.CL_int, batchSize)
-	//C = make([]cl.CL_long, batchSize)
+type Once struct { /* Has unexported fields. */ }
 
-	var idx cl.CL_size_t
+var (
+	left  *oclParam
+	right *oclParam
+	currentProc *oclParam
+	oclBankSelect = false
 
-	for idx = 0; idx < batchSize; idx++ {
-		var in cl.CL_size_t
-		for in = 0; in < pxMsgLen; in++ {
-			A[idx*pxMsgLen+in] = testMsg[in]
-		}
+	mutex 	sync.Mutex
+)
+
+
+func bankSelect() *oclParam {
+	switch oclBankSelect {
+	case true:
+		return left
+	case false:
+		return right
+	}
+	return nil //never reached
+}
+
+func dumpA(px *pxBufT){
+	var str=""
+	pxbuf:=*px
+ 	for i:=0;i<3*pxMsgLen;i++ {
+		str+=string(pxbuf[i])
+	}
+	log.Printf("A=%v/%v....",px,str)
+}
+
+func  goIt(lbf *oclParam) {
+//	defer timeTrack(time.Now(), "OCLProc")
+	defer mutex.Unlock()
+
+	var status cl.CL_int
+	//dumpA(&lbf.A)
+	var globalWorkSize [1]cl.CL_size_t
+	// There are 'batchSize' work-items
+	globalWorkSize[0] = batchSize
+
+	// STEP 11: Enqueue the kernel for execution
+
+	status = cl.CLEnqueueNDRangeKernel(lbf.cmdQueue, lbf.kernel, 1, nil, globalWorkSize[:], nil, 0, nil, nil)
+	if status != cl.CL_SUCCESS {
+		log.Fatalf("CLEnqueueNDRangeKernel failed %v", status)
 	}
 
-	// Use this to check the output of each API call
+	cl.CLFinish(lbf.cmdQueue)
+
+	for i:=0;i<int(batchSize);i++ {
+		x:=lbf.X[i]
+		y:=lbf.Y[i]
+		c:=lbf.C[i]
+	//	log.Printf("setting px %v %v %v",x,y,c)
+		if uint32(x)<W&& uint32(y) < H{
+			setPixel(uint32(x),uint32(y),c)
+		}
+
+	}
+	lbf.currentOffset=0 //set this buffer to 0
+
+
+}
+
+func copyArr(startOffset int,targetArr *pxBufT, m []byte) {
+	end:=len(m)
+	for i:=0 ;i <  end ; i++ {
+		(*targetArr)[startOffset+i]=m[i]
+	}
+}
+
+func clparse(m []byte) {
+//func clparse(m string) {
+	bank:=bankSelect()
+	startOffset:=bank.currentOffset
+	endOffset:=startOffset+pxMsgLen
+
+	//if endOffset % 1000*pxMsgLen==0 {
+	//	log.Printf("end offset %v",endOffset)
+	//}
+	if endOffset > int(datasizeA) { //we're full, off to the races!
+		mutex.Lock()
+		oclBankSelect=!oclBankSelect  //select other bank
+		go goIt(bank) //start processing this bank
+		//log.Printf("flip bank to %v",&bankSelect().A)
+		clparse(m)  //try again
+	} else {
+		copyArr(startOffset,&(bank.A),m)
+
+		//todo missing 0 in not copies things.. Perhaps terminate with zero?
+		bank.currentOffset=endOffset
+	}
+}
+
+func initClParser() {
+	left = &oclParam{}
+	right = &oclParam{}
+	clinit(left)
+	clinit(right)
+	oclBankSelect=false
+	currentProc=bankSelect()
+}
+
+
+
+func clinit(lbf *oclParam) {
+	var idx cl.CL_size_t
 	var status cl.CL_int
 
 	// STEP 1: Discover and initialize the platforms
@@ -118,145 +236,158 @@ func clinit() {
 		displayDeviceInfo(devices[j], cl.CL_DEVICE_PROFILE, "CL_DEVICE_PROFILE")
 		displayDeviceInfo(devices[j], cl.CL_DEVICE_MAX_COMPUTE_UNITS, "DEVICE_MAX_COMPUTE_UNITS")
 		displayDeviceInfo(devices[j], cl.CL_DEVICE_LOCAL_MEM_SIZE, "DEVICE_LOCAL_MEM_SIZE")
-		//displayDeviceInfo(devices[j], cl.CL_DEVICE_EXTENSIONS, "DEVICE_EXTENSIONS")
+		displayDeviceInfo(devices[j], cl.CL_DEVICE_ENDIAN_LITTLE, "DEVICE_ENDIAN_LITTLE")
+
 		log.Print("\n")
 	}
 
 	// STEP 3: Create a context
 
-	selectedDevice := devices[0:1]
+	selectedDevice := devices[1:2]
 	log.Print("selected device:")
 	displayDeviceInfo(selectedDevice[0], cl.CL_DEVICE_NAME, "CL_DEVICE_NAME")
 
-	var context cl.CL_context
-	context = cl.CLCreateContext(nil, 1, selectedDevice, nil, nil, &status)
+	lbf.context = cl.CLCreateContext(nil, 1, selectedDevice, nil, nil, &status)
 	if status != cl.CL_SUCCESS {
 		log.Fatalf("CLCreateContext failed %v", status)
 	}
 
 	// STEP 4: Create a command queue
-	var cmdQueue cl.CL_command_queue
 
-	cmdQueue = cl.CLCreateCommandQueue(context, selectedDevice[0], 0, &status)
+	lbf.cmdQueue = cl.CLCreateCommandQueue(lbf.context, selectedDevice[0], 0, &status)
 	if status != cl.CL_SUCCESS {
 		log.Fatalf("CLCreateCommandQueue %v", status)
 	}
 
+	//Let OpenCL create the buffer (to deal with alignment)
+	lbf.bufferA = cl.CLCreateBuffer(lbf.context, cl.CL_MEM_READ_ONLY|cl.CL_MEM_HOST_WRITE_ONLY|cl.CL_MEM_ALLOC_HOST_PTR, datasizeA, nil, &status)
+	if status != cl.CL_SUCCESS {
+		log.Fatalf("CLCreateBuffer failed %v", status)
+	}
+	//and map it back into host space, wait for sync
+	lbf.A = pxBufT(cl.CLEnqueueMapBuffer(lbf.cmdQueue, lbf.bufferA, cl.CL_TRUE, cl.CL_MAP_WRITE, 0, datasizeA, 0, nil, nil, &status))
+	if status != cl.CL_SUCCESS {
+		log.Fatalf("MapBuffer failed %v", status)
+	}
 
+	lbf.bufferX = cl.CLCreateBuffer(lbf.context, cl.CL_MEM_WRITE_ONLY|cl.CL_MEM_HOST_READ_ONLY|cl.CL_MEM_ALLOC_HOST_PTR, datasizeXY, nil, &status)
+	if status != cl.CL_SUCCESS {
+		log.Fatalf("CLCreateBuffer failed %v", status)
+	}
+	lbf.X = coordBufT(cl.CLEnqueueMapBuffer(lbf.cmdQueue, lbf.bufferX, cl.CL_FALSE, cl.CL_MAP_READ, 0, datasizeXY, 0, nil, nil, &status))
+	if status != cl.CL_SUCCESS {
+		log.Fatalf("MapBuffer failed %v", status)
+	}
 
-	bufferA := cl.CLCreateBuffer(context, cl.CL_MEM_READ_ONLY | cl.CL_MEM_USE_HOST_PTR , datasizeA, unsafe.Pointer(&A), &status)
+	lbf.bufferY = cl.CLCreateBuffer(lbf.context, cl.CL_MEM_WRITE_ONLY|cl.CL_MEM_HOST_READ_ONLY|cl.CL_MEM_ALLOC_HOST_PTR, datasizeXY, nil, &status)
 	if status != cl.CL_SUCCESS {
 		log.Fatalf("CLCreateBuffer failed %v", status)
 	}
 
-	bufferX := cl.CLCreateBuffer(context, cl.CL_MEM_WRITE_ONLY /*| cl.CL_MEM_ALLOC_HOST_PTR*/, datasizeXY, nil, &status)
+	//map output buffers
+	lbf.Y = coordBufT(cl.CLEnqueueMapBuffer(lbf.cmdQueue, lbf.bufferY, cl.CL_FALSE, cl.CL_MAP_READ, 0, datasizeXY, 0, nil, nil, &status))
+	if status != cl.CL_SUCCESS {
+		log.Fatalf("MapBuffer failed %v", status)
+	}
+
+	lbf.bufferC = cl.CLCreateBuffer(lbf.context, cl.CL_MEM_WRITE_ONLY|cl.CL_MEM_HOST_READ_ONLY|cl.CL_MEM_ALLOC_HOST_PTR, datasizeC, nil, &status)
 	if status != cl.CL_SUCCESS {
 		log.Fatalf("CLCreateBuffer failed %v", status)
 	}
 
-	bufferY := cl.CLCreateBuffer(context, cl.CL_MEM_WRITE_ONLY /*| cl.CL_MEM_ALLOC_HOST_PTR*/, datasizeXY, nil, &status)
+	lbf.C = colBufT(cl.CLEnqueueMapBuffer(lbf.cmdQueue, lbf.bufferC, cl.CL_FALSE, cl.CL_MAP_READ, 0, datasizeC, 0, nil, nil, &status))
 	if status != cl.CL_SUCCESS {
-		log.Fatalf("CLCreateBuffer failed %v", status)
+		log.Fatalf("MapBuffer failed %v", status)
 	}
 
-	bufferC := cl.CLCreateBuffer(context, cl.CL_MEM_WRITE_ONLY /* | cl.CL_MEM_ALLOC_HOST_PTR*/, datasizeC, nil, &status)
-	if status != cl.CL_SUCCESS {
-		log.Fatalf("CLCreateBuffer failed %v", status)
+
+	// init test data
+
+	for idx = 0; idx < batchSize; idx++ {
+		var in cl.CL_size_t
+		for in = 0; in < pxMsgLen; in++ {
+			lbf.A[idx*pxMsgLen+in] = testMsg[in]
+		}
 	}
 
-	// STEP 7: Create and compile the program
+	// Create and compile the program
 
-	program := utils.Build_program(context, selectedDevice, "clparser.cl", []byte("-Werror"))
-	if program == nil {
+	lbf.program = utils.Build_program(lbf.context, selectedDevice, "clparser.cl", []byte("-Werror"))
+	if lbf.program == nil {
 		log.Fatalf("Build program failed")
 	}
 
-	// STEP 8: Create the kernel
-	var kernel cl.CL_kernel
-
-	kernel = cl.CLCreateKernel(*program, []byte("clparser"), &status)
+	lbf.kernel = cl.CLCreateKernel(*lbf.program, []byte("clparser"), &status)
 	if status != cl.CL_SUCCESS {
-		log.Fatal("CLCreateKernel  failed %v", status)
+		log.Fatalf("CLCreateKernel failed %v", status)
 	}
 
-	// STEP 9: Set the kernel arguments
-	status = cl.CLSetKernelArg(kernel, 0, cl.CL_size_t(unsafe.Sizeof(bufferA)), unsafe.Pointer(&bufferA))
-	status |= cl.CLSetKernelArg(kernel, 1, cl.CL_size_t(unsafe.Sizeof(bufferX)), unsafe.Pointer(&bufferX))
-	status |= cl.CLSetKernelArg(kernel, 2, cl.CL_size_t(unsafe.Sizeof(bufferY)), unsafe.Pointer(&bufferY))
-	status |= cl.CLSetKernelArg(kernel, 3, cl.CL_size_t(unsafe.Sizeof(bufferC)), unsafe.Pointer(&bufferC))
+	//  Set the kernel arguments
+	bufA := lbf.bufferA
+	bufX := lbf.bufferX
+	bufY := lbf.bufferY
+	bufC := lbf.bufferC
+	//bufPixel :=lbf.bufferPXM
+	status = cl.CLSetKernelArg(lbf.kernel, 0, cl.CL_size_t(unsafe.Sizeof(bufA)), unsafe.Pointer(&bufA))
+	status |= cl.CLSetKernelArg(lbf.kernel, 1, cl.CL_size_t(unsafe.Sizeof(bufX)), unsafe.Pointer(&bufX))
+	status |= cl.CLSetKernelArg(lbf.kernel, 2, cl.CL_size_t(unsafe.Sizeof(bufY)), unsafe.Pointer(&bufY))
+	status |= cl.CLSetKernelArg(lbf.kernel, 3, cl.CL_size_t(unsafe.Sizeof(bufC)), unsafe.Pointer(&bufC))
+	//status |= cl.CLSetKernelArg(lbf.kernel, 4, cl.CL_size_t(unsafe.Sizeof(bufPixel)), unsafe.Pointer(&bufPixel))
+
+	//status |= cl.CLSetKernelArg(lbf.kernel, 4, cl.CL_size_t(unsafe.Sizeof(maxX)), unsafe.Pointer(&maxX))
+	//status |= cl.CLSetKernelArg(lbf.kernel, 5, cl.CL_size_t(unsafe.Sizeof(maxY)), unsafe.Pointer(&maxY))
+
+
 	if status != cl.CL_SUCCESS {
 		log.Fatalf("CLSetKernelArg failed %v", status)
 	}
 
+}
+
+
+func oclFree(lbf *oclParam) {
+	// Free OpenCL resources
+	cl.CLReleaseKernel(lbf.kernel)
+	cl.CLReleaseProgram(*lbf.program)
+	cl.CLReleaseCommandQueue(lbf.cmdQueue)
+	cl.CLReleaseMemObject(lbf.bufferA)
+	cl.CLReleaseMemObject(lbf.bufferX)
+	cl.CLReleaseMemObject(lbf.bufferY)
+	cl.CLReleaseMemObject(lbf.bufferC)
+	cl.CLReleaseContext(lbf.context)
+}
+
+
+/*
+func main() {
+	initTestMsg()
+
+	//right :=&oclParam{}
+	clinit(left)
+
 	// STEP 6: Write host data to device buffers
-	log.Printf("go (batch size/iter %v/%v) total=%v", batchSize,numIter,humanize.Comma(int64(batchSize)*numIter))
+	log.Printf("go (batch size/iter %v/%v)", batchSize, numIter)
 	start := time.Now()
 
 	for r := 0; r < numIter; r++ {
-		/*
-		not required since we submitted this via buffer allocation with CL_MEM_USE_HOST_PTR
-		status = cl.CLEnqueueWriteBuffer(cmdQueue, bufferA, cl.CL_FALSE, 0, datasizeA, unsafe.Pointer(&A[0]), 0, nil, nil)
-		if status != cl.CL_SUCCESS {
-			log.Fatalf("CLEnqueueWriteBuffer failed %v", status)
-		}*/
-
-		// STEP 10: Configure the work-item structure
-
-		var globalWorkSize [1]cl.CL_size_t
-		// There are 'batchSize' work-items
-		globalWorkSize[0] = batchSize
-
-		// STEP 11: Enqueue the kernel for execution
-
-		status = cl.CLEnqueueNDRangeKernel(cmdQueue, kernel, 1, nil, globalWorkSize[:], nil, 0, nil, nil)
-		if status != cl.CL_SUCCESS {
-			log.Fatalf("CLEnqueueNDRangeKernel failed %v", status)
-		}
-
-		// STEP 12: Read the output buffer back to the host
-
-		cl.CLEnqueueReadBuffer(cmdQueue, bufferX, cl.CL_FALSE, 0, datasizeXY, unsafe.Pointer(&X[0]), 0, nil, nil)
-		if status != cl.CL_SUCCESS {
-			log.Fatalf("CLEnqueueReadBuffer failed %v", status)
-		}
-
-		cl.CLEnqueueReadBuffer(cmdQueue, bufferY, cl.CL_FALSE, 0, datasizeXY, unsafe.Pointer(&Y[0]), 0, nil, nil)
-		if status != cl.CL_SUCCESS {
-			log.Fatalf("CLEnqueueReadBuffer failed %v", status)
-		}
-
-		cl.CLEnqueueReadBuffer(cmdQueue, bufferC, cl.CL_FALSE, 0, datasizeC, unsafe.Pointer(&C[0]), 0, nil, nil)
-		if status != cl.CL_SUCCESS {
-			log.Fatal("CLEnqueueReadBuffer status!=cl.CL_SUCCESS")
-		}
-		cl.CLFinish(cmdQueue)
+		goIt(left)
 	}
 
+	log.Print("finished");
 	elapsed := time.Since(start)
 
 	// STEP 13: Release OpenCL resources
 
 	log.Printf("elapsed: %s", elapsed)
-	log.Printf("x(batchSize/2)=%v", X[1])
-	log.Printf("color(batchSize/2)=%X", C[1])
-	log.Printf("datasizeC=%v",humanize.Comma(int64(datasizeC)))
-	log.Printf("datasizeA=%v",humanize.Comma(int64(datasizeA)))
-	log.Printf("throughtput %v PX/sec",humanize.Comma(int64((float64(batchSize*numIter)/elapsed.Seconds()))))
+	log.Printf("x(1)=%v", (*left.X)[0])
+	log.Printf("y(1)=%v", left.Y[0])
+	log.Printf("color(b1)=%X", left.C[1])
+	log.Printf("datasizeC=%v", datasizeC)
+	log.Printf("throughput %v", humanize.Comma(int64(float64(batchSize)*float64(numIter)/float64(elapsed.Seconds()))))
+	oclFree(left)
 
-	// Free OpenCL resources
-	cl.CLReleaseKernel(kernel)
-	cl.CLReleaseProgram(*program)
-	cl.CLReleaseCommandQueue(cmdQueue)
-	cl.CLReleaseMemObject(bufferA)
-	cl.CLReleaseMemObject(bufferX)
-	cl.CLReleaseMemObject(bufferY)
-	cl.CLReleaseMemObject(bufferC)
-	cl.CLReleaseContext(context)
 }
-
-func main() {
-	clinit()
-}
+*/
 
 func displayPlatformInfo(id cl.CL_platform_id, name cl.CL_platform_info, str string) {
 	var errNum cl.CL_int

@@ -5,11 +5,11 @@ import (
 )
 
 
-
 type ofState  struct {
 	W uint32
 	H uint32
 }
+
 
 
 //lookup table for hex digits
@@ -91,6 +91,10 @@ func parsUint(m []byte) uint32 {
 
 	//todo increment error count
 	return 0
+}
+
+func initParser() {
+
 }
 
 //Parse & performf a "PX" line

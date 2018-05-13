@@ -1,51 +1,51 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	_ "net/http/pprof"
 	"os"
 	"runtime"
-	"runtime/pprof"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
 	"github.com/dustin/go-humanize"
 	"unsafe"
-	"math/rand"
+	"net/http"
+	"github.com/pkg/profile"
 )
 
-//uint32 to save on sign manipulation in hot loop
-var W uint32
-var H uint32
-
-//only used if simulation is active
-var lines []string
-
-const numSimUpdater = 1          //0=disable
-var targetFps time.Duration = 15 //0=disable
+const numSimUpdater = 1 //0=disable
 const performTrace = false
 
-var pixelXXCnt int64
-var totalPixelCnt int64
+var (
+	//uint32 to save on sign manipulation in hot loop
+	W uint32
+	H uint32
 
-var pixels *[]uint32
+	//only used if simulation is active
+	blines [][]byte
 
-var xrunning = true
+	targetFps time.Duration = 15 //0=disable
 
-//statisitcs counters
-var frames uint64
-var errorCnt int64
-var outOfRangeErrorCnt int64
+	pixelXXCnt    int64
+	totalPixelCnt int64
 
-var serverQuit = make(chan int)
+	pixels *[]uint32
 
-//status line related state
-var statsMsg = "ಠ_ಠ Please stand by."
+	xrunning = true
 
+	//statisitcs counters
+	frames             uint64
+	errorCnt           int64
+	outOfRangeErrorCnt int64
+
+	serverQuit = make(chan int)
+
+	//status line related state
+	statsMsg = "ಠ_ಠ Please stand by."
+)
 
 func updateStatsDisplay() {
 	for isRunning() {
@@ -74,17 +74,10 @@ func checkError(err error) {
 //no bounds check on x and y!
 //color is whatever the underyling texture uses (BGR)
 func setPixel(x uint32, y uint32, color uint32) /* chan? */ {
-
 	offset := y*W + x
-	offset2 := (W*H - offset)-1
-
+	offset2 := (W*H - offset) - 1
 	(*pixels)[offset2] = color
-
 }
-
-var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
-var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
-var tracecall = flag.String("trace", "", "write trace profile to `file`")
 
 func isRunning() bool {
 	return xrunning
@@ -106,69 +99,53 @@ func updateSim(gridx int) {
 		runtime.Gosched()
 	}
 
-	numLines := len(lines)
+	numLines := len(blines)
 	for isRunning() {
-		for _, element := range lines {
-			pfparse([]byte(element))
-			time.Sleep(time.Duration(rand.Int63n(100)) * time.Nanosecond) // some random delay
-
+		for _, element := range blines {
+			//pfparse([]byte(element))
+			//clparse([]byte(element))
+			clparse(element)
+			//time.Sleep(time.Duration(rand.Int63n(10)) * time.Nanosecond) // some random delay
 		}
 		atomic.AddInt64(&pixelXXCnt, int64(numLines))
 	}
 	log.Printf("Exit updateSim %v", gridx)
 }
 
-//take 10 memory profiles every 5 seconds
-func memProfileWriter() {
-	for i := 0; i < 10; i++ {
-		time.Sleep(5 * time.Second)
-		memprofileFn := "memprofile.pprof." + strconv.Itoa(i)
-		f, err := os.Create(memprofileFn)
-		if err != nil {
-			log.Fatal(err)
-		}
-		pprof.WriteHeapProfile(f)
-		f.Close()
-	}
-}
-
 func main() {
 	runtime.GOMAXPROCS(8 + runtime.NumCPU())
+	//defer profile.Start(profile.MemProfile).Stop()
 
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	defer profile.Start().Stop()
 
-	flag.Parse()
-	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
-		if err != nil {
-			log.Fatal("could not create CPU profile: ", err)
-		}
-		//runtime.SetCPUProfileRate(200)
-		if err := pprof.StartCPUProfile(f); err != nil {
-			log.Fatal("could not start CPU profile: ", err)
-		}
-		defer pprof.StopCPUProfile()
-	}
-	if *memprofile != "" {
-		go memProfileWriter()
-	}
+	initClParser()
 
-	runtime.LockOSThread()  //OpenGL does not like being called from multiple threads
+	runtime.LockOSThread() //OpenGL does not like being called from multiple threads
+
 	initGl()
 
-	buf :=  make([]uint32, W*H)
+	buf := make([]uint32, W*H)
 	pixels = (*[]uint32)(unsafe.Pointer(&buf)) //wrangle into array of uint32
 
 	setupScene()
 
 	go updateStatsDisplay()
 
+	go func() {
+		log.Println(http.ListenAndServe("localhost:8080", nil))
+	}()
+
 	//simulated messages
 	if numSimUpdater > 0 {
 		bdata, err := ioutil.ReadFile("test.pxfl")
 		checkError(err)
 		s := string(bdata)
-		lines = strings.Split(s, "\n")
+		lines := strings.Split(s, "\n")
+		blines = make ([][]byte,len(lines))
+		for k,v := range lines {
+			blines[k]=[]byte(v)
+		}
 
 		for i := 0; i < numSimUpdater; i++ {
 			go updateSim(i)

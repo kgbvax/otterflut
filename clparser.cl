@@ -8,6 +8,10 @@ const __constant unsigned int hexval32[256]=
 
 const __constant int elemSize=32;
 
+/* const __constant int maxX=800;
+ const __constant int maxY=800; */
+
+
 int searchNonSpace(__global uchar *line,int offset);
 int searchSpace(__global uchar *line,int offset);
 ushort parsUint(__global uchar *m, int len);
@@ -23,15 +27,15 @@ inline int searchNonSpace(__global uchar *line,int offset) {
 }
 
 inline int searchSpace(__global uchar *line,int offset) {
-    int i=offset;
-    while (i < elemSize &&  line[i] != ' ' && line[i]!=0 ) {
-           i++;
+
+    while (offset < elemSize &&  line[offset] != ' ' && line[offset]!=0 ) {
+           offset++;
     }
-    return i;
+    return offset;
 }
 
 
-inline ushort  parsUint(__global uchar *m, int len) {
+inline  ushort  parsUint(__global uchar *m, int len) {
 	const ushort ZERO = 0x30;
 
 	switch (len) {
@@ -64,49 +68,55 @@ inline uint parseHex3ToBGR(__global uchar *m)  {
            0x000100*hexval32[m[3]] + 0x000010*hexval32[m[0]] + hexval32[m[1]];
 }
 
+
+
 kernel void clparser(global uchar *lines,  global ushort *x,  global ushort *y,  global uint *color) {
-  // int offset=0;
- //   int len=0;
     int idx = get_global_id(0);
 
     __global uchar *line =&(lines[idx*elemSize]);
 
-
     int startOfX = searchNonSpace(line,3);
-   // printf("startOfX=%d\n",startOfX);
-
     int endOfX = searchSpace(line,startOfX+1);
-  //  printf("endOfX=%d\n",endOfX);
+    int x1=parsUint(&line[startOfX],endOfX-startOfX);
 
+    x[idx]=x1;
+   // printf("x=%d",x1);
 
-  //  printf("len=%d\n",len);
-   // printf("start ch0=%hhx",line[startOfX]);
-   // printf("start ch1=%hhx",line[startOfX+1]);
-   //  printf("start ch2=%hhx",line[startOfX+2]);
-
-
-    x[idx]=parsUint(&line[startOfX],endOfX-startOfX);;
-  //  printf("parsed %d",parsed);
-     int startOfY =endOfX+1;
+    int startOfY =endOfX+1;
     int endOfY = searchSpace(line,startOfY);
-
-    y[idx]=parsUint(&line[startOfY],endOfY-startOfY);;
+    y[idx]=parsUint(&line[startOfY],endOfY-startOfY);
 
 
     int startOfC = endOfY+1;
-   // int endOfC = searchSpace(line,startOfC);
-   // printf("startOfC %d\n",startOfC);
-   // printf("endOfC %d\n",endOfC);
-     //printf(( __constant char *)"parsi %d\n",idx);
-
-
-   // printf("col=%d %d\n",idx,c);
+    //TODO add case to handle Alpha and garbage at end of PX line
     color[idx]=parseHex3ToBGR(&(line[startOfC]));
-
-
-    // PX 123 34 FFFFFF
-
-  //  searchNonSpace
-  //  parseUint
-
 }
+
+/*
+kernel void clparser(global uchar *lines,  global uint *pixel, global int W, global int H) {
+    int idx = get_global_id(0);
+
+    __global uchar *line =&(lines[idx*elemSize]);
+
+    int startOfX = searchNonSpace(line,3);
+    int endOfX = searchSpace(line,startOfX+1);
+    int x1=parsUint(&line[startOfX],endOfX-startOfX);
+
+    x[idx]=x1;
+   // printf("x=%d",x1);
+
+    int startOfY =endOfX+1;
+    int endOfY = searchSpace(line,startOfY);
+    y[idx]=parsUint(&line[startOfY],endOfY-startOfY);
+
+
+    int startOfC = endOfY+1;
+    //TODO add case to handle Alpha and garbage at end of PX line
+    color[idx]=parseHex3ToBGR(&(line[startOfC]));
+    int offset= y1 * 800
+    pixels[]
+}
+offset := y*W + x
+	offset2 := (W*H - offset) - 1
+	(*pixels)[offset2] = color
+	*/

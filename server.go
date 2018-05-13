@@ -68,7 +68,8 @@ func handleBuffer(buffer []byte, conn *net.TCPConn) {
 			if len(msg) > 0 {
 				if msg[0] == 'P' {
 					if processPX {
-						pfparse(msg)
+						//pfparse(msg)
+						//clparse(msg)
 					}
 					messagesProcessedInChunk++
 

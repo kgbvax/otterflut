@@ -1,6 +1,6 @@
 //
 // +build darwin linux windows
-// +build amd64 386 arm
+// +build amd64
 //
 // ^^  assume that these platforms provide full OpenGL support
 
@@ -11,7 +11,6 @@ import (
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/gl/v3.2-compatibility/gl"
 )
-
 
 var (
 	texture uint32
@@ -68,16 +67,7 @@ func makeTexture()  {
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-	gl.TexImage2D(
-		gl.TEXTURE_2D,
-		0,
-		gl.RGBA,
-		int32(W),
-		int32(H),
-		0,
-		gl.RGBA,
-		gl.UNSIGNED_BYTE,
-		gl.Ptr(*pixels))
+	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, int32(W), int32(H), 0, gl.RGBA, gl.UNSIGNED_BYTE, gl.Ptr(*pixels))
 
 }
 
