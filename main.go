@@ -16,8 +16,8 @@ import (
 	"github.com/pkg/profile"
 )
 
-const numSimUpdater = 1 //0=disable
-const performTrace = false
+const numSimUpdater = 2 //0=disable
+const enableProfiling = true
 
 var (
 	//uint32 to save on sign manipulation in hot loop
@@ -114,10 +114,17 @@ func updateSim(gridx int) {
 
 func main() {
 	runtime.GOMAXPROCS(8 + runtime.NumCPU())
-	//defer profile.Start(profile.MemProfile).Stop()
+	if enableProfiling    {
+		//defer profile.Start(profile.TraceProfile).Stop()
+		defer profile.Start().Stop()
+
+		go func() {
+			log.Println(http.ListenAndServe("localhost:8080", nil))
+		}()
+	}
 
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	defer profile.Start().Stop()
+
 
 	initClParser()
 
@@ -132,9 +139,6 @@ func main() {
 
 	go updateStatsDisplay()
 
-	go func() {
-		log.Println(http.ListenAndServe("localhost:8080", nil))
-	}()
 
 	//simulated messages
 	if numSimUpdater > 0 {

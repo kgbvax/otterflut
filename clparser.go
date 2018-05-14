@@ -17,6 +17,7 @@ import (
 	"gocl/cl_demo/utils"
 	"log"
 	"sync"
+	"sync/atomic"
 )
 
 var testMsg [22]byte
@@ -49,8 +50,9 @@ type colBufT *[batchSize]uint32
 type pixelBufT* [1920*1080]uint32
 
 type oclParam struct {
-	currentOffset	int
+	currentOffset	int32
 	A        pxBufT    //input array
+	Amutex	 sync.Mutex
 	X        coordBufT //output ushort[]
 	Y        coordBufT //output ushort[]
 	C        colBufT   //output uint
@@ -75,7 +77,7 @@ var (
 	currentProc *oclParam
 	oclBankSelect = false
 
-	mutex 	sync.Mutex
+
 )
 
 
@@ -100,7 +102,7 @@ func dumpA(px *pxBufT){
 
 func  goIt(lbf *oclParam) {
 //	defer timeTrack(time.Now(), "OCLProc")
-	defer mutex.Unlock()
+
 
 	var status cl.CL_int
 	//dumpA(&lbf.A)
@@ -116,49 +118,52 @@ func  goIt(lbf *oclParam) {
 	}
 
 	cl.CLFinish(lbf.cmdQueue)
+	lbf.currentOffset=0 //set this buffer to 0
+	lbf.Amutex.Unlock() // from here on updates of input params is accetable
+
 
 	for i:=0;i<int(batchSize);i++ {
 		x:=lbf.X[i]
 		y:=lbf.Y[i]
-		c:=lbf.C[i]
+
 	//	log.Printf("setting px %v %v %v",x,y,c)
 		if uint32(x)<W&& uint32(y) < H{
-			setPixel(uint32(x),uint32(y),c)
+			setPixel(uint32(x),uint32(y),lbf.C[i])
 		}
-
 	}
-	lbf.currentOffset=0 //set this buffer to 0
-
-
 }
 
-func copyArr(startOffset int,targetArr *pxBufT, m []byte) {
-	end:=len(m)
-	for i:=0 ;i <  end ; i++ {
-		(*targetArr)[startOffset+i]=m[i]
+func copyArr(startOffset int32,targetArr *pxBufT, m []byte) {
+	end:=int32(len(m))
+	tgt:=*targetArr
+	var i int32 =0
+
+	for ;i <  end ; i++ {
+		tgt[startOffset+i]=m[i]
+	}
+	for ; i < pxMsgLen; i++ {
+		tgt[startOffset+i]=0
 	}
 }
 
 func clparse(m []byte) {
 //func clparse(m string) {
 	bank:=bankSelect()
-	startOffset:=bank.currentOffset
-	endOffset:=startOffset+pxMsgLen
+	endOffset:=atomic.AddInt32(&bank.currentOffset,pxMsgLen) //for the next to come...
+	startOffset:=endOffset-pxMsgLen
 
-	//if endOffset % 1000*pxMsgLen==0 {
-	//	log.Printf("end offset %v",endOffset)
-	//}
-	if endOffset > int(datasizeA) { //we're full, off to the races!
-		mutex.Lock()
-		oclBankSelect=!oclBankSelect  //select other bank
+	if endOffset > int32(datasizeA) { //we're full, off to the races!
+		bank.Amutex.Lock() //lock this bank until it is processed.
 		go goIt(bank) //start processing this bank
+
+		oclBankSelect=!oclBankSelect  //select other bank
 		//log.Printf("flip bank to %v",&bankSelect().A)
-		clparse(m)  //try again
+  		clparse(m)  //try again
 	} else {
 		copyArr(startOffset,&(bank.A),m)
 
 		//todo missing 0 in not copies things.. Perhaps terminate with zero?
-		bank.currentOffset=endOffset
+		//atomic.StoreInt32(&bank.currentOffset,endOffset)
 	}
 }
 
