@@ -69,15 +69,12 @@ type oclParam struct {
 
 }
 
-type Once struct { /* Has unexported fields. */ }
 
 var (
 	left  *oclParam
 	right *oclParam
 	currentProc *oclParam
 	oclBankSelect = false
-
-
 )
 
 
@@ -127,7 +124,7 @@ func  goIt(lbf *oclParam) {
 		y:=lbf.Y[i]
 
 	//	log.Printf("setting px %v %v %v",x,y,c)
-		if uint32(x)<W&& uint32(y) < H{
+		if uint32(x) <W&& uint32(y) < H{
 			setPixel(uint32(x),uint32(y),lbf.C[i])
 		}
 	}
@@ -154,6 +151,7 @@ func clparse(m []byte) {
 
 	if endOffset > int32(datasizeA) { //we're full, off to the races!
 		bank.Amutex.Lock() //lock this bank until it is processed.
+		dumpA(&bank.A)
 		go goIt(bank) //start processing this bank
 
 		oclBankSelect=!oclBankSelect  //select other bank

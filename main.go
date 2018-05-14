@@ -102,9 +102,9 @@ func updateSim(gridx int) {
 	numLines := len(blines)
 	for isRunning() {
 		for _, element := range blines {
-			//pfparse([]byte(element))
+			pfparse(element)
 			//clparse([]byte(element))
-			clparse(element)
+			//clparse(element)
 			//time.Sleep(time.Duration(rand.Int63n(10)) * time.Nanosecond) // some random delay
 		}
 		atomic.AddInt64(&pixelXXCnt, int64(numLines))

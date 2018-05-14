@@ -103,7 +103,12 @@ func pfparse(m []byte) {
 	var color uint32
 
 
+	if len(m)<13 {// does not get shorter than this -- PX 1 1 AAAAAA
+		return
+	}
+
 	start, end := nextNonWs(m, 3)
+	//log.Printf("nextNon %v %v %v ",m,start,end)
 	x := parsUint(m[start:end])
 	//log.Printf("e1: %v %v %v",string(m[start:end]),start,end)
 
