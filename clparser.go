@@ -102,7 +102,7 @@ func  goIt(lbf *oclParam) {
 
 
 	var status cl.CL_int
-	//dumpA(&lbf.A)
+
 	var globalWorkSize [1]cl.CL_size_t
 	// There are 'batchSize' work-items
 	globalWorkSize[0] = batchSize
@@ -151,7 +151,7 @@ func clparse(m []byte) {
 
 	if endOffset > int32(datasizeA) { //we're full, off to the races!
 		bank.Amutex.Lock() //lock this bank until it is processed.
-		dumpA(&bank.A)
+		//dumpA(&bank.A)
 		go goIt(bank) //start processing this bank
 
 		oclBankSelect=!oclBankSelect  //select other bank

@@ -6,7 +6,7 @@ const __constant unsigned int hexval32[256]=
         ['b']= 0xB, ['B']= 0xB, ['c']=0xC, ['C']=0xC, ['d']= 0xD, ['D']= 0xD,
         ['e']= 0xE, ['E']= 0xE, ['f']= 0xF, ['F']= 0xF};
 
-const __constant int elemSize=32;
+const __constant int elemSize=22;
 
 /* const __constant int maxX=800;
  const __constant int maxY=800; */
