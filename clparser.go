@@ -12,7 +12,7 @@ package main
  */
 
 import (
-	"gocl/cl"
+	"github.com/rainliu/gocl/cl"
 	"unsafe"
  	"log"
 	"sync"
