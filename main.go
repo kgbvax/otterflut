@@ -11,13 +11,12 @@ import (
 	"sync/atomic"
 	"time"
 	"github.com/dustin/go-humanize"
-	"unsafe"
 	"net/http"
 	"github.com/pkg/profile"
 )
 
-const numSimUpdater = 2 //0=disable
-const enableProfiling = true
+const numSimUpdater = 10 //0=disable
+const enableProfiling = false
 
 var (
 	//uint32 to save on sign manipulation in hot loop
@@ -133,7 +132,7 @@ func main() {
 	initGl()
 
 	buf := make([]uint32, W*H)
-	pixels = (*[]uint32)(unsafe.Pointer(&buf)) //wrangle into array of uint32
+	pixels = &buf// (*[]uint32)(unsafe.Pointer(&buf)) //wrangle into array of uint32
 
 	setupScene()
 

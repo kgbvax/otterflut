@@ -130,38 +130,37 @@ func  goIt(lbf *oclParam) {
 	}
 }
 
-func copyArr(startOffset int32,targetArr *pxBufT, m []byte) {
-	end:=int32(len(m))
-	tgt:=*targetArr
-	var i int32 =0
+// to my dismay, we currently need to copy the "PX" line here into the target buffer
+// todo next iteration, shove TCP buffers straight into OCL buffer
+func copyArr(startOffset int32,bank *oclParam, m []byte) {
+	//mlen:=int32(len(m))
 
-	for ;i <  end ; i++ {
-		tgt[startOffset+i]=m[i]
-	}
-	for ; i < pxMsgLen; i++ {
-		tgt[startOffset+i]=0
-	}
+	slicer:=(*bank.A)[startOffset:]
+	//log.Printf("len/cap %v %v",len(m),cap(m))
+	//log.Printf("len2/cap2 %v %v ",len(slicer[startOffset:]),cap(slicer[startOffset:]))
+	//if (len(m)< cap(slicer)) {
+	copy(slicer,m)
 }
 
 func clparse(m []byte) {
-//func clparse(m string) {
 	bank:=bankSelect()
+
+	//the next 5 lines are really fishy in terms of race conditions...
+
 	endOffset:=atomic.AddInt32(&bank.currentOffset,pxMsgLen) //for the next to come...
 	startOffset:=endOffset-pxMsgLen
 
-	if endOffset > int32(datasizeA) { //we're full, off to the races!
+	if endOffset >= int32(datasizeA) { //we're full, off to the races!
+		oclBankSelect=!oclBankSelect  //select other bank so other callers
 		bank.Amutex.Lock() //lock this bank until it is processed.
+
 		//dumpA(&bank.A)
 		go goIt(bank) //start processing this bank
 
-		oclBankSelect=!oclBankSelect  //select other bank
 		//log.Printf("flip bank to %v",&bankSelect().A)
   		clparse(m)  //try again
 	} else {
-		copyArr(startOffset,&(bank.A),m)
-
-		//todo missing 0 in not copies things.. Perhaps terminate with zero?
-		//atomic.StoreInt32(&bank.currentOffset,endOffset)
+		copyArr(startOffset,bank,m)
 	}
 }
 
