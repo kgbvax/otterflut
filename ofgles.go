@@ -1,5 +1,5 @@
 //
-// +build linux darwin
+// +build linux
 // +build arm arm64 amd64
 //
 // ^^  assume that these platforms provide full OpenGL support
@@ -13,11 +13,11 @@ import (
 )
 
 var (
-	texture uint32
-	window  *glfw.Window
+	texturegles uint32
+	windowgles  *glfw.Window
 )
 
-func initGl() {
+func initGles() {
 	var err error
 
 	if err := glfw.Init(); err != nil {
@@ -43,19 +43,19 @@ func initGl() {
 	gles2.Enable(gles2.TEXTURE_2D)
 }
 
-func ofGlShouldClose() bool {
+func ofGlesShouldClose() bool {
 	return window.ShouldClose()
 }
 
-func ofGlSwapBuffer() {
+func ofGlesSwapBuffer() {
 	window.SwapBuffers()
 }
 
-func ofGlPollEvents() {
+func ofGlesPollEvents() {
 	glfw.PollEvents()
 }
 
-func makeTexture() {
+func makeGlesTexture() {
 	gles2.DeleteTextures(1, &texture)
 
 	gles2.GenTextures(1, &texture)
@@ -72,26 +72,9 @@ func makeTexture() {
 #define ox (22.0f / (1920.0f / 2.0f))
 #define oy (58.0f / (1080.0f / 2.0f))
  */
-const ox float32 = 1.0
-const oy float32 = 1.0
 
-var quadVertices  = [...]float32{
-	-1.0 + ox, 1.0 - oy,
-	1.0 - ox, 1.0 - oy,
-	-1.0 + ox, -1.0 + oy,
-	1.0 - ox, -1.0 + oy,
-	-1.0 + ox, -1.0 + oy,
-	1.0 - ox, 1.0 - oy}
 
-var quadTexcoord = [...]float32{
-	0.0, 0.0,
-	1.0, 0.0,
-	0.0, 1.0,
-	1.0, 1.0,
-	0.0, 1.0,
-	1.0, 0.0}
-
-func setupScene() {
+func setupGlesScene() {
 	//gles2.Enable(gles2.DEPTH_TEST)
 
 	gles2.ClearColor(0.0, 0.0, 0.0, 0.0)
@@ -110,15 +93,15 @@ func setupScene() {
 	gles2.LoadIdentity() */
 }
 
-func destroyScene() {
+func destroyGlesScene() {
 }
 
-func tearDown() {
+func tearDownGles() {
 	glfw.Terminate()
 
 }
 
-func drawScene() {
+func drawGlesScene() {
 	gles2.Clear(gles2.COLOR_BUFFER_BIT)
 
 	/* gles2.MatrixMode(gles2.MODELVIEW)

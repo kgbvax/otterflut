@@ -1,8 +1,8 @@
 //
-// +build darwin linux windows
+// +build darwin
 // +build amd64
 //
-// ^^  assume that these platforms provide full OpenGL support
+// ^^  tested platforms
 
 package main
 
@@ -10,7 +10,6 @@ import (
 	"github.com/go-gl/glfw/v3.2/glfw"
 	"github.com/go-gl/gl/v3.2-compatibility/gl"
 
-	"log"
 )
 
 var (
@@ -29,32 +28,7 @@ var (
 1.0f, 0.0f
 }  */
 
-func initGl() {
-	var err error
 
-	if err := glfw.Init(); err != nil {
-		log.Fatalln("failed to initialize glfw:", err)
-	}
-
-
-	monitor := glfw.GetPrimaryMonitor()
-
-	W = uint32(monitor.GetVideoMode().Width)
-	H = uint32(monitor.GetVideoMode().Height)
-
-	log.Printf("monitor '%v' %v x %v", monitor.GetName(), W, H)
-	window, err = glfw.CreateWindow(int(W), int(H), "Otterflut", nil, nil)
-	if err != nil {
-		panic(err)
-	}
-	window.MakeContextCurrent()
-
-	if err := gl.Init(); err != nil {
-		panic(err)
-	}
-
-	gl.Enable(gl.TEXTURE_2D)
-}
 
 func ofGlShouldClose() bool {
 	return window.ShouldClose()
@@ -86,9 +60,15 @@ func makeTexture()  {
 func setupScene() {
 	//gl.Enable(gl.DEPTH_TEST)
 
+	if err := gl.Init(); err != nil {
+		panic(err)
+	}
+	gl.Enable(gl.TEXTURE_2D)
+	gl.Disable(gl.DEPTH_TEST)
+
+
 	gl.ClearColor(0.0, 0.0, 0.0, 0.0)
-	gl.ClearDepth(1)
-	gl.DepthFunc(gl.LEQUAL)
+
 
 	gl.MatrixMode(gl.PROJECTION)
 	gl.LoadIdentity()
@@ -118,8 +98,13 @@ func drawScene() {
 	gl.BindTexture(gl.TEXTURE_2D, texture)
 	gl.Color4f(1, 1, 1, 1)
 
+	/* gl.VertexAttribPointer(0, 2, gl.FLOAT, false, 0, unsafe.Pointer(&quadVertices))
+	gl.EnableVertexAttribArray(0)
 
-	gl.Begin(gl.QUADS)
+	gl.VertexAttribPointer(1, 2, gl.FLOAT, false, 0, unsafe.Pointer(&quadTexcoord))
+	gl.EnableVertexAttribArray(1) */
+
+	 gl.Begin(gl.QUADS)
 	gl.TexCoord2f(0, 0)
 	gl.Vertex3f(-1, -1, -1)
 	gl.TexCoord2f(1, 0)

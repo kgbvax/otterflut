@@ -14,7 +14,7 @@ package main
 import (
 	"github.com/rainliu/gocl/cl"
 	"unsafe"
- 	"log"
+	"log"
 	"sync"
 	"sync/atomic"
 	"os"
@@ -23,16 +23,18 @@ import (
 var testMsg [22]byte
 
 const (
-	pxMsgLen = 22  //the maximum size of "PX" message we are willing to handle
+	pxMsgLen = 22 //the maximum size of "PX" message we are willing to handle
 	//batchSize = cl.CL_size_t(524288) // number of PX messages we submit to the kernel in one go
 	batchSize = cl.CL_size_t(524288)
-	lenUint16 = 2 //OpenCL ushort
-	lenUint32 = 4 //OpenCL uint
+	lenUint16 = 2   //OpenCL ushort
+	lenUint32 = 4   //OpenCL uint
 	numIter   = 500 // only for testing
 
-	datasizeA  = cl.CL_size_t(pxMsgLen * batchSize) //number of bytes in the A input array (PX msg)
-	datasizeXY = cl.CL_size_t(batchSize * lenUint16) //number of bytes in the X/Y output
-	datasizeC  = cl.CL_size_t(batchSize * lenUint32) //number of bytes in the color output
+	datasizeA     = cl.CL_size_t(pxMsgLen * batchSize)  //number of bytes in the A input array (PX msg)
+	datasizeXY    = cl.CL_size_t(batchSize * lenUint16) //number of bytes in the X/Y output
+	datasizeC     = cl.CL_size_t(batchSize * lenUint32) //number of bytes in the color output
+	datasizeAMax  = int32(datasizeA)
+	datasizeASync = datasizeAMax * 5 / 10
 )
 
 func initTestMsg() {
@@ -42,64 +44,51 @@ func initTestMsg() {
 	for k, v := range msg {
 		testMsg[k] = byte(v)
 	}
+
 }
 
 type pxBufT *[batchSize * pxMsgLen]byte
 type coordBufT *[batchSize]uint16
 type colBufT *[batchSize]uint32
-type pixelBufT* [1920*1080]uint32
+type pixelBufT *[1920 * 1080]uint32
 
 type oclParam struct {
-	currentOffset	int32
-	A        pxBufT    //input array
-	Amutex	 sync.Mutex
-	X        coordBufT //output ushort[]
-	Y        coordBufT //output ushort[]
-	C        colBufT   //output uint
-	PXM      pixelBufT //output pixmap
-	bufferA  cl.CL_mem
-	bufferX  cl.CL_mem
-	bufferY  cl.CL_mem
-	bufferC  cl.CL_mem
-	bufferPXM cl.CL_mem
-	context  cl.CL_context
-	kernel   cl.CL_kernel
-	cmdQueue cl.CL_command_queue
-	program  *cl.CL_program
-
+	currentOffset int32
+	A             pxBufT //input array
+	Amutex        sync.Mutex
+	X             coordBufT //output ushort[]
+	Y             coordBufT //output ushort[]
+	C             colBufT   //output uint
+	PXM           pixelBufT //output pixmap  //future
+	bufferA       cl.CL_mem
+	bufferX       cl.CL_mem
+	bufferY       cl.CL_mem
+	bufferC       cl.CL_mem
+	bufferPXM     cl.CL_mem //future
+	context       cl.CL_context
+	kernel        cl.CL_kernel
+	cmdQueue      cl.CL_command_queue
+	program       *cl.CL_program
 }
 
-
 var (
-	left  *oclParam
-	right *oclParam
-	currentProc *oclParam
+	left          *oclParam
+	right         *oclParam
+	currentProc   *oclParam
 	oclBankSelect = false
 )
 
-
-func bankSelect() *oclParam {
-	switch oclBankSelect {
-	case true:
-		return left
-	case false:
-		return right
+func dumpA(px *pxBufT) {
+	var str = ""
+	pxbuf := *px
+	for i := 0; i < 3*pxMsgLen; i++ {
+		str += string(pxbuf[i])
 	}
-	return nil //never reached
+	log.Printf("A=%v/%v....", px, str)
 }
 
-func dumpA(px *pxBufT){
-	var str=""
-	pxbuf:=*px
- 	for i:=0;i<3*pxMsgLen;i++ {
-		str+=string(pxbuf[i])
-	}
-	log.Printf("A=%v/%v....",px,str)
-}
-
-func  goIt(lbf *oclParam) {
-//	defer timeTrack(time.Now(), "OCLProc")
-
+func goIt(lbf *oclParam) {
+	//	defer timeTrack(time.Now(), "OCLProc")
 
 	var status cl.CL_int
 
@@ -115,52 +104,63 @@ func  goIt(lbf *oclParam) {
 	}
 
 	cl.CLFinish(lbf.cmdQueue)
-	lbf.currentOffset=0 //set this buffer to 0
-	lbf.Amutex.Unlock() // from here on updates of input params is accetable
+	lbf.currentOffset = 0 //set this buffer to 0
+	lbf.Amutex.Unlock()   // from here on updates of input params is accetable
 
+	for i := 0; i < int(batchSize); i++ {
+		x := lbf.X[i]
+		y := lbf.Y[i]
 
-	for i:=0;i<int(batchSize);i++ {
-		x:=lbf.X[i]
-		y:=lbf.Y[i]
-
-	//	log.Printf("setting px %v %v %v",x,y,c)
-		if uint32(x) <W&& uint32(y) < H{
-			setPixel(uint32(x),uint32(y),lbf.C[i])
+		//	log.Printf("setting px %v %v %v",x,y,c)
+		if uint32(x) < W && uint32(y) < H {
+			setPixel(uint32(x), uint32(y), lbf.C[i])
 		}
 	}
 }
 
-// to my dismay, we currently need to copy the "PX" line here into the target buffer
-// todo next iteration, shove TCP buffers straight into OCL buffer
-func copyArr(startOffset int32,bank *oclParam, m []byte) {
-	//mlen:=int32(len(m))
-
-	slicer:=(*bank.A)[startOffset:]
-	//log.Printf("len/cap %v %v",len(m),cap(m))
-	//log.Printf("len2/cap2 %v %v ",len(slicer[startOffset:]),cap(slicer[startOffset:]))
-	//if (len(m)< cap(slicer)) {
-	copy(slicer,m)
-}
-
 func clparse(m []byte) {
-	bank:=bankSelect()
 
-	//the next 5 lines are really fishy in terms of race conditions...
+	var bank *oclParam
 
-	endOffset:=atomic.AddInt32(&bank.currentOffset,pxMsgLen) //for the next to come...
-	startOffset:=endOffset-pxMsgLen
+	/* 	Since we're feeding into OpenCL whose interface  is unsuitable for streams,
+	we accumulate a batch of messages that get submitted to the kernel.
+	To avoid delays during OpenCL processing, this uses double-buffering.
 
-	if endOffset >= int32(datasizeA) { //we're full, off to the races!
-		oclBankSelect=!oclBankSelect  //select other bank so other callers
-		bank.Amutex.Lock() //lock this bank until it is processed.
+	I admit that the whole construct is ugly. */
 
-		//dumpA(&bank.A)
-		go goIt(bank) //start processing this bank
+	switch oclBankSelect {
+	case true:
+		bank = left
+	case false:
+		bank = right
+	}
 
-		//log.Printf("flip bank to %v",&bankSelect().A)
-  		clparse(m)  //try again
+	endOffset := atomic.AddInt32(&bank.currentOffset, pxMsgLen) //for the next to come...
+
+	/* this function is "almost threat safe": Race conditions occur in cases where a buffer is becomes full
+	(and is handed off for OpenCL processing) therefore we start synchronizing only when the buffer is "almost" full.
+	this sounds bizarre but since mutexes are expensive this has a sizable performance benefit.
+	And it also does not work. Perhaps move from socket straight into OpenCL
+
+	For context this aims to move 1.25 Gb/sec or ~50 Million messages/sec */
+
+	if endOffset > datasizeASync { // we are almot full, better sync ;-)
+		bank.Amutex.Lock() //this has a severe performance penalty so we try to avoid this in most cases
+
+		if endOffset >= datasizeAMax { //we're full, off to the races!
+			oclBankSelect = !oclBankSelect //select other bank
+
+			go goIt(bank) //start processing this bank, this will also release the lock when it is no longer needed
+
+			clparse(m) //try again
+		} else {
+			bank.Amutex.Unlock()
+			startOffset := endOffset - pxMsgLen
+			copy((*bank.A)[startOffset:], m)
+		}
 	} else {
-		copyArr(startOffset,bank,m)
+		startOffset := endOffset - pxMsgLen
+		copy((*bank.A)[startOffset:], m)
 	}
 }
 
@@ -169,11 +169,10 @@ func initClParser() {
 	right = &oclParam{}
 	clinit(left)
 	clinit(right)
-	oclBankSelect=false
-	currentProc=bankSelect()
+	oclBankSelect = false
+	currentProc = left
+	log.Printf("datasizeA %v sync at %v", datasizeAMax, datasizeASync)
 }
-
-
 
 func clinit(lbf *oclParam) {
 	var idx cl.CL_size_t
@@ -302,7 +301,6 @@ func clinit(lbf *oclParam) {
 		log.Fatalf("MapBuffer failed %v", status)
 	}
 
-
 	// init test data
 
 	for idx = 0; idx < batchSize; idx++ {
@@ -339,13 +337,11 @@ func clinit(lbf *oclParam) {
 	//status |= cl.CLSetKernelArg(lbf.kernel, 4, cl.CL_size_t(unsafe.Sizeof(maxX)), unsafe.Pointer(&maxX))
 	//status |= cl.CLSetKernelArg(lbf.kernel, 5, cl.CL_size_t(unsafe.Sizeof(maxY)), unsafe.Pointer(&maxY))
 
-
 	if status != cl.CL_SUCCESS {
 		log.Fatalf("CLSetKernelArg failed %v", status)
 	}
 
 }
-
 
 func oclFree(lbf *oclParam) {
 	// Free OpenCL resources
@@ -358,7 +354,6 @@ func oclFree(lbf *oclParam) {
 	cl.CLReleaseMemObject(lbf.bufferC)
 	cl.CLReleaseContext(lbf.context)
 }
-
 
 /*
 func main() {

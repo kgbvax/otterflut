@@ -15,7 +15,7 @@ import (
 	"github.com/pkg/profile"
 )
 
-const numSimUpdater = 10 //0=disable
+const numSimUpdater = 5 //0=disable
 const enableProfiling = false
 
 var (
@@ -48,7 +48,7 @@ var (
 
 func updateStatsDisplay() {
 	for isRunning() {
-		time.Sleep(time.Second * 1)
+		time.Sleep(time.Second * 2)
 		var sumPixelCount int64
 		sumPixelCount = atomic.LoadInt64(&pixelXXCnt)
 
@@ -124,12 +124,11 @@ func main() {
 
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-
 	initClParser()
 
 	runtime.LockOSThread() //OpenGL does not like being called from multiple threads
 
-	initGl()
+	initGlfw()
 
 	buf := make([]uint32, W*H)
 	pixels = &buf// (*[]uint32)(unsafe.Pointer(&buf)) //wrangle into array of uint32
