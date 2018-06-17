@@ -25,7 +25,7 @@ var testMsg [22]byte
 const (
 	pxMsgLen = 22 //the maximum size of "PX" message we are willing to handle
 	//batchSize = cl.CL_size_t(524288) // number of PX messages we submit to the kernel in one go
-	batchSize = cl.CL_size_t(524288)
+	batchSize = cl.CL_size_t(131072)
 	lenUint16 = 2   //OpenCL ushort
 	lenUint32 = 4   //OpenCL uint
 	numIter   = 500 // only for testing
