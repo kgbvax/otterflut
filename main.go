@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/profile"
 	"os/signal"
 	"syscall"
+	"runtime/pprof"
 )
 
 const numSimUpdater = 5 //0=disable
@@ -117,7 +118,13 @@ func main() {
 	runtime.GOMAXPROCS(8 + runtime.NumCPU())
 	if enableProfiling    {
 		//defer profile.Start(profile.TraceProfile).Stop()
-		defer profile.Start().Stop()
+		f, err := os.Create("otterflot.pprof")
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+
+		defer pprof.StopCPUProfile()
 
 		go func() {
 			log.Println(http.ListenAndServe("localhost:8080", nil))
