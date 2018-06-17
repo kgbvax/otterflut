@@ -1,6 +1,6 @@
 //
-// +build darwin
-// +build amd64
+// +build darwin linux
+// +build amd64 arm64
 //
 // ^^  tested platforms
 
