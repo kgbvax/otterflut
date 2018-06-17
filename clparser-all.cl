@@ -12,10 +12,10 @@ const __constant int elemSize=22;
  const __constant int maxY=800; */
 
 
-int     searchNonSpace(__global uchar *line,int offset);
-int     searchSpace(__global uchar *line,int offset);
-ushort  parsUint(__global uchar *m, int len);
-uint    parseHex3ToBGR(__global uchar *m);
+int searchNonSpace(__global uchar *line,int offset);
+int searchSpace(__global uchar *line,int offset);
+ushort parsUint(__global uchar *m, int len);
+uint parseHex3ToBGR(__global uchar *m);
 
 
 inline int searchNonSpace(__global uchar *line,int offset) {
