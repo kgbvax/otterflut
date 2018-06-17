@@ -12,8 +12,7 @@ import (
 	"time"
 	"github.com/dustin/go-humanize"
 	"net/http"
-	"github.com/pkg/profile"
-	"os/signal"
+ 	"os/signal"
 	"syscall"
 	"runtime/pprof"
 )
