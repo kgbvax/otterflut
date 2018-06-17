@@ -17,7 +17,7 @@ import (
 	"runtime/pprof"
 )
 
-const numSimUpdater = 5 //0=disable
+const numSimUpdater = 2 //0=disable
 const enableProfiling = false
 
 var (
@@ -28,7 +28,7 @@ var (
 	//only used if simulation is active
 	blines [][]byte
 
-	targetFps time.Duration = 15 //0=disable
+	targetFps time.Duration = 5 //0=disable
 
 	pixelXXCnt    int64
 	totalPixelCnt int64

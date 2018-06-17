@@ -52,6 +52,7 @@ func initGlfw() {
 
 	W = uint32(monitor.GetVideoMode().Width)
 	H = uint32(monitor.GetVideoMode().Height)
+	log.Printf("glVer %v",glfw.GetVersionString())
 
 	log.Printf("monitor '%v' %v x %v", monitor.GetName(), W, H)
 	window, err = glfw.CreateWindow(int(W), int(H), "Otterflut", nil, nil)
