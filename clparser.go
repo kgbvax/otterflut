@@ -244,7 +244,7 @@ func clinit(lbf *oclParam) {
 
 	// STEP 3: Create a context
 
-	selectedDevice := devices[1:2]
+	selectedDevice := devices[0:1]
 	log.Print("selected device:")
 	displayDeviceInfo(selectedDevice[0], cl.CL_DEVICE_NAME, "CL_DEVICE_NAME")
 
