@@ -13,6 +13,8 @@ import (
 	"github.com/dustin/go-humanize"
 	"net/http"
 	"github.com/pkg/profile"
+	"os/signal"
+	"syscall"
 )
 
 const numSimUpdater = 5 //0=disable
@@ -121,6 +123,16 @@ func main() {
 			log.Println(http.ListenAndServe("localhost:8080", nil))
 		}()
 	}
+
+	//orderly shutdown on signal
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs,  syscall.SIGTERM, syscall.SIGQUIT)
+	go func() {
+		sig := <-sigs
+		log.Printf("got signal: %v",sig.String())
+		stopRunning()
+	}()
+
 
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
